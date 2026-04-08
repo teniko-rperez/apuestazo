@@ -46,7 +46,7 @@ export default function ValorPage() {
             return (
               <Card
                 key={ev.id}
-                className="hover:border-blue-500/30 transition-colors"
+                className="hover:border-blue-200 transition-colors"
               >
                 <CardContent className="pt-4">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -71,7 +71,7 @@ export default function ValorPage() {
                     <div className="flex items-center gap-6">
                       <div className="text-center">
                         <p className="text-xs text-muted-foreground">Odds</p>
-                        <p className="font-mono font-bold text-orange-400">
+                        <p className="font-mono font-bold text-orange-500">
                           {formatOdds(ev.odds)}
                         </p>
                       </div>
@@ -87,7 +87,7 @@ export default function ValorPage() {
                         <p className="text-xs text-muted-foreground">
                           Ventaja
                         </p>
-                        <p className="font-mono font-bold text-orange-400">
+                        <p className="font-mono font-bold text-orange-500">
                           {formatPct(ev.edge_pct)}
                         </p>
                       </div>

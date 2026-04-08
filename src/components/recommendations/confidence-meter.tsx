@@ -6,10 +6,10 @@ export function ConfidenceMeter({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const color =
     score >= 0.8
-      ? "text-orange-400"
+      ? "text-orange-500"
       : score >= 0.6
-        ? "text-yellow-400"
-        : "text-orange-400";
+        ? "text-yellow-600"
+        : "text-orange-500";
   const label =
     score >= 0.8 ? "Alta" : score >= 0.6 ? "Media" : "Baja";
 

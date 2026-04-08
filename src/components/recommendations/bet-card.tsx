@@ -15,10 +15,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  arbitrage: "bg-yellow-500/20 text-yellow-400",
-  ev: "bg-blue-500/20 text-blue-400",
-  value: "bg-blue-500/20 text-blue-400",
-  parlay_leg: "bg-purple-500/20 text-purple-400",
+  arbitrage: "bg-yellow-100 text-yellow-600",
+  ev: "bg-blue-100 text-blue-700",
+  value: "bg-blue-100 text-blue-700",
+  parlay_leg: "bg-purple-100 text-purple-600",
 };
 
 export function BetCard({ rec }: { rec: Recommendation }) {
@@ -35,7 +35,7 @@ export function BetCard({ rec }: { rec: Recommendation }) {
     : "";
 
   return (
-    <Card className="hover:border-blue-500/30 transition-colors">
+    <Card className="hover:border-blue-200 transition-colors">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -72,7 +72,7 @@ export function BetCard({ rec }: { rec: Recommendation }) {
             <p className="text-xs text-muted-foreground">
               {bookmaker?.name ?? rec.bookmaker_key}
             </p>
-            <p className="text-lg font-bold text-blue-400">
+            <p className="text-lg font-bold text-blue-600">
               {formatOdds(rec.odds)}
             </p>
           </div>

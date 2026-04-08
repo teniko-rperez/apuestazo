@@ -67,7 +67,7 @@ export function ArbCalculator({ arb }: { arb: ArbitrageOpportunity }) {
           <span className="text-sm text-muted-foreground">
             Ganancia garantizada:
           </span>
-          <span className="text-lg font-bold text-orange-400 font-mono">
+          <span className="text-lg font-bold text-orange-500 font-mono">
             ${guaranteedProfit.toFixed(2)}
           </span>
         </div>

@@ -46,7 +46,7 @@ function GameRow({ event, odds }: { event: GameEvent; odds: LatestOdds[] }) {
               {event.sport_key === "basketball_nba" ? "🏀 NBA" : "⚾ MLB"}
             </span>
             {event.completed ? (
-              <Badge className="bg-muted text-muted-foreground text-[10px] px-1.5">
+              <Badge className="bg-gray-100 text-gray-500 text-[10px] px-1.5">
                 FINAL
               </Badge>
             ) : (
@@ -66,7 +66,7 @@ function GameRow({ event, odds }: { event: GameEvent; odds: LatestOdds[] }) {
             </div>
             {awayOdds && (
               <div className="text-right ml-2">
-                <span className="text-sm font-mono font-bold text-orange-400">
+                <span className="text-sm font-mono font-bold text-orange-500">
                   {formatOdds(awayOdds.price)}
                 </span>
                 <span className="text-[9px] text-muted-foreground ml-1">
@@ -89,7 +89,7 @@ function GameRow({ event, odds }: { event: GameEvent; odds: LatestOdds[] }) {
             </div>
             {homeOdds && (
               <div className="text-right ml-2">
-                <span className="text-sm font-mono font-bold text-orange-400">
+                <span className="text-sm font-mono font-bold text-orange-500">
                   {formatOdds(homeOdds.price)}
                 </span>
                 <span className="text-[9px] text-muted-foreground ml-1">
@@ -114,10 +114,10 @@ function RecCard({ rec }: { rec: Record<string, unknown> }) {
   const confScore = rec.confidence_score as number;
   const confColor =
     confScore >= 0.8
-      ? "text-orange-400"
+      ? "text-orange-500"
       : confScore >= 0.6
-        ? "text-yellow-400"
-        : "text-orange-400";
+        ? "text-yellow-600"
+        : "text-orange-500";
 
   return (
     <Card>
@@ -126,10 +126,10 @@ function RecCard({ rec }: { rec: Record<string, unknown> }) {
           <Badge
             className={
               rec.type === "arbitrage"
-                ? "bg-yellow-500/20 text-yellow-400 text-[10px]"
+                ? "bg-yellow-100 text-yellow-600 text-[10px]"
                 : rec.type === "ev"
-                  ? "bg-orange-500/20 text-orange-400 text-[10px]"
-                  : "bg-purple-500/20 text-purple-400 text-[10px]"
+                  ? "bg-orange-100 text-orange-500 text-[10px]"
+                  : "bg-purple-100 text-purple-600 text-[10px]"
             }
           >
             {rec.type === "arbitrage"
@@ -149,7 +149,7 @@ function RecCard({ rec }: { rec: Record<string, unknown> }) {
           <span className="text-sm font-medium">
             {rec.outcome_name as string}
           </span>
-          <span className="text-sm font-mono font-bold text-orange-400">
+          <span className="text-sm font-mono font-bold text-orange-500">
             {formatOdds(rec.odds as number)}
           </span>
         </div>
@@ -180,10 +180,10 @@ function SimBetCard({ bet }: { bet: Record<string, unknown> }) {
               <Badge
                 className={
                   result === "won"
-                    ? "bg-orange-500/20 text-orange-400 text-[10px]"
+                    ? "bg-orange-100 text-orange-500 text-[10px]"
                     : result === "lost"
-                      ? "bg-red-500/20 text-red-400 text-[10px]"
-                      : "bg-blue-500/20 text-blue-400 text-[10px]"
+                      ? "bg-red-100 text-red-500 text-[10px]"
+                      : "bg-blue-100 text-blue-700 text-[10px]"
                 }
               >
                 {result === "won"
@@ -207,7 +207,7 @@ function SimBetCard({ bet }: { bet: Record<string, unknown> }) {
             </p>
             {profit != null && (
               <p
-                className={`text-sm font-mono font-bold ${profit >= 0 ? "text-orange-400" : "text-red-400"}`}
+                className={`text-sm font-mono font-bold ${profit >= 0 ? "text-orange-500" : "text-red-500"}`}
               >
                 {profit >= 0 ? "+" : ""}${profit.toFixed(0)}
               </p>
@@ -234,11 +234,11 @@ function SectionHeader({
       <h2 className="text-base font-bold">
         {title}
         {count != null && count > 0 && (
-          <span className="text-orange-400 ml-1.5 text-sm">({count})</span>
+          <span className="text-orange-500 ml-1.5 text-sm">({count})</span>
         )}
       </h2>
       {href && (
-        <Link href={href} className="text-xs text-blue-400">
+        <Link href={href} className="text-xs text-blue-600">
           Ver todo
         </Link>
       )}
@@ -288,13 +288,13 @@ export default function Dashboard() {
       {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-2 mt-2">
         <div className="bg-card rounded-lg p-2 text-center border border-border">
-          <p className="text-lg font-bold text-yellow-400">
+          <p className="text-lg font-bold text-yellow-600">
             {arbs?.length ?? 0}
           </p>
           <p className="text-[9px] text-muted-foreground">ARB</p>
         </div>
         <div className="bg-card rounded-lg p-2 text-center border border-border">
-          <p className="text-lg font-bold text-blue-400">
+          <p className="text-lg font-bold text-blue-600">
             {evs?.length ?? 0}
           </p>
           <p className="text-[9px] text-muted-foreground">+EV</p>
@@ -307,7 +307,7 @@ export default function Dashboard() {
         </div>
         <div className="bg-card rounded-lg p-2 text-center border border-border">
           <p
-            className={`text-lg font-bold ${totalProfit >= 0 ? "text-orange-400" : "text-red-400"}`}
+            className={`text-lg font-bold ${totalProfit >= 0 ? "text-orange-500" : "text-red-500"}`}
           >
             {totalProfit >= 0 ? "+" : ""}${totalProfit.toFixed(0)}
           </p>

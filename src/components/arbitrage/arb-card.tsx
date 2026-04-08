@@ -23,7 +23,7 @@ export function ArbCard({ arb }: { arb: ArbitrageOpportunity }) {
                 : "Evento"}
             </CardTitle>
           </div>
-          <Badge className="bg-yellow-500/20 text-yellow-400 font-bold">
+          <Badge className="bg-yellow-100 text-yellow-600 font-bold">
             +{formatPct(arb.profit_margin)} garantizado
           </Badge>
         </div>
@@ -45,7 +45,7 @@ export function ArbCard({ arb }: { arb: ArbitrageOpportunity }) {
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-sm font-bold text-blue-400">
+                <p className="font-mono text-sm font-bold text-blue-600">
                   {formatOdds(leg.odds)}
                 </p>
                 <p className="text-xs text-muted-foreground">

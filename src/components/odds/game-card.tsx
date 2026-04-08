@@ -37,23 +37,23 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
 
   return (
     <Link href={`/${sportPath}/${event.id}`}>
-      <Card className={`hover:border-blue-500/30 transition-colors cursor-pointer ${isCompleted ? "opacity-70" : ""}`}>
+      <Card className={`hover:border-blue-200 transition-colors cursor-pointer ${isCompleted ? "opacity-70" : ""}`}>
         <CardContent className="pt-4">
           <div className="flex items-start justify-between mb-3">
             <p className="text-xs text-muted-foreground">{gameTime}</p>
             <div className="flex gap-1">
               {isCompleted && (
-                <Badge className="bg-muted text-muted-foreground text-[10px]">
+                <Badge className="bg-gray-100 text-gray-500 text-[10px]">
                   FINAL
                 </Badge>
               )}
               {hasArb && (
-                <Badge className="bg-yellow-500/20 text-yellow-400 text-[10px]">
+                <Badge className="bg-yellow-100 text-yellow-600 text-[10px]">
                   ARB
                 </Badge>
               )}
               {hasEv && (
-                <Badge className="bg-orange-500/20 text-orange-400 text-[10px]">
+                <Badge className="bg-orange-100 text-orange-500 text-[10px]">
                   +EV
                 </Badge>
               )}
@@ -113,7 +113,7 @@ function TeamLine({
       </div>
       {bestOdds != null && (
         <div className="text-right">
-          <span className="text-sm font-mono font-bold text-orange-400">
+          <span className="text-sm font-mono font-bold text-orange-500">
             {formatOdds(bestOdds)}
           </span>
           {bestBook && (

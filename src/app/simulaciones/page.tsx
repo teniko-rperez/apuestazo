@@ -51,10 +51,10 @@ function useSimulatedBets() {
 }
 
 const RESULT_STYLES: Record<string, string> = {
-  won: "bg-blue-500/20 text-blue-400",
-  lost: "bg-red-500/20 text-red-400",
-  push: "bg-yellow-500/20 text-yellow-400",
-  pending: "bg-blue-500/20 text-blue-400",
+  won: "bg-blue-100 text-blue-700",
+  lost: "bg-red-100 text-red-500",
+  push: "bg-yellow-100 text-yellow-600",
+  pending: "bg-blue-100 text-blue-700",
 };
 
 const RESULT_LABELS: Record<string, string> = {
@@ -103,13 +103,13 @@ export default function SimulacionesPage() {
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground uppercase">Ganadas</p>
-            <p className="text-2xl font-bold text-blue-400">{wonBets}</p>
+            <p className="text-2xl font-bold text-blue-600">{wonBets}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground uppercase">Perdidas</p>
-            <p className="text-2xl font-bold text-red-400">{lostBets}</p>
+            <p className="text-2xl font-bold text-red-500">{lostBets}</p>
           </CardContent>
         </Card>
         <Card>
@@ -121,7 +121,7 @@ export default function SimulacionesPage() {
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground uppercase">Ganancia</p>
-            <p className={`text-2xl font-bold ${totalProfit >= 0 ? "text-orange-400" : "text-red-400"}`}>
+            <p className={`text-2xl font-bold ${totalProfit >= 0 ? "text-orange-500" : "text-red-500"}`}>
               {totalProfit >= 0 ? "+" : ""}${totalProfit.toFixed(2)}
             </p>
           </CardContent>
@@ -183,8 +183,8 @@ export default function SimulacionesPage() {
                         className={`font-mono font-bold ${
                           bet.profit != null
                             ? bet.profit >= 0
-                              ? "text-orange-400"
-                              : "text-red-400"
+                              ? "text-orange-500"
+                              : "text-red-500"
                             : "text-muted-foreground"
                         }`}
                       >

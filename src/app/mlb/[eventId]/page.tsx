@@ -33,7 +33,7 @@ export default function MlbGameDetail({
       <div>
         <Link
           href="/mlb"
-          className="text-sm text-blue-400 hover:underline mb-2 block"
+          className="text-sm text-blue-600 hover:underline mb-2 block"
         >
           &larr; Volver a MLB
         </Link>
