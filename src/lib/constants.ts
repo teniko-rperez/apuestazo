@@ -50,6 +50,7 @@ export const NAV_ITEMS = [
   { href: '/valor', label: 'Valor +EV' },
   { href: '/props', label: 'Props' },
   { href: '/expertos', label: 'Expertos' },
+  { href: '/simulaciones', label: 'Simulador' },
 ];
 
 export const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';

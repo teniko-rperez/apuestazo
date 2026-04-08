@@ -239,10 +239,114 @@ export async function GET(request: Request) {
       summary.recommendations = recommendations.length;
     }
 
-    // 5. Expire old opportunities
+    // 5. Create simulated bets from top recommendations
+    const { data: newRecs } = await supabase
+      .from('recommendations')
+      .select('*')
+      .gte('valid_until', new Date().toISOString())
+      .order('confidence_score', { ascending: false })
+      .limit(5);
+
+    if (newRecs && newRecs.length > 0) {
+      // Check which events don't already have a simulated bet
+      for (const rec of newRecs) {
+        const { data: existingBet } = await supabase
+          .from('simulated_bets')
+          .select('id')
+          .eq('event_id', rec.event_id)
+          .eq('outcome_name', rec.outcome_name)
+          .eq('market_key', rec.market_key)
+          .limit(1);
+
+        if (!existingBet || existingBet.length === 0) {
+          await supabase.from('simulated_bets').insert({
+            event_id: rec.event_id,
+            market_key: rec.market_key,
+            outcome_name: rec.outcome_name,
+            bookmaker_key: rec.bookmaker_key,
+            odds: rec.odds,
+            stake: 100,
+            source: rec.type,
+            reasoning: rec.reasoning,
+            result: 'pending',
+          });
+        }
+      }
+      summary.simulatedBetsCreated = newRecs.length;
+    }
+
+    // 6. Settle completed simulated bets
+    const { data: pendingBets } = await supabase
+      .from('simulated_bets')
+      .select('*, events(completed, scores, home_team, away_team)')
+      .eq('result', 'pending');
+
+    if (pendingBets) {
+      for (const bet of pendingBets) {
+        const event = (bet as Record<string, unknown>).events as {
+          completed: boolean;
+          scores: { home: number; away: number } | null;
+          home_team: string;
+          away_team: string;
+        } | null;
+
+        if (!event?.completed || !event.scores) continue;
+
+        // Determine if bet won based on market type
+        let won: boolean | null = null;
+        const homeScore = event.scores.home;
+        const awayScore = event.scores.away;
+
+        if (bet.market_key === 'h2h') {
+          // Moneyline: did the picked team win?
+          const pickedHome = bet.outcome_name === event.home_team;
+          won = pickedHome ? homeScore > awayScore : awayScore > homeScore;
+        } else if (bet.market_key === 'totals') {
+          // Over/Under
+          const total = homeScore + awayScore;
+          // Get point from odds snapshots
+          const { data: snapshot } = await supabase
+            .from('odds_snapshots')
+            .select('outcomes')
+            .eq('event_id', bet.event_id)
+            .eq('market_key', 'totals')
+            .order('fetched_at', { ascending: false })
+            .limit(1);
+
+          if (snapshot?.[0]) {
+            const outcomes = snapshot[0].outcomes as Array<{ name: string; point?: number }>;
+            const line = outcomes[0]?.point ?? 0;
+            if (bet.outcome_name === 'Over') {
+              won = total > line;
+            } else {
+              won = total < line;
+            }
+          }
+        }
+
+        if (won !== null) {
+          const decimal = bet.odds > 0 ? bet.odds / 100 : 100 / Math.abs(bet.odds);
+          const profit = won ? bet.stake * decimal : -bet.stake;
+
+          await supabase
+            .from('simulated_bets')
+            .update({
+              result: won ? 'won' : 'lost',
+              profit,
+              settled_at: new Date().toISOString(),
+            })
+            .eq('id', bet.id);
+        }
+      }
+      summary.betsSettled = pendingBets.filter(
+        (b) => ((b as Record<string, unknown>).events as { completed: boolean } | null)?.completed
+      ).length;
+    }
+
+    // 7. Expire old opportunities
     await supabase.rpc('expire_old_opportunities');
 
-    summary.source = 'ESPN + Covers + Reddit (sin API key)';
+    summary.source = 'ESPN Core API + Covers + Reddit (sin API key)';
 
     return NextResponse.json({ success: true, summary });
   } catch (error) {

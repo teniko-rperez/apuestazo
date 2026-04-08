@@ -33,7 +33,14 @@
       "Bash(git commit:*)",
       "Bash(curl -s -X POST \"https://bhyfpijrlgsrremiaevk.supabase.co/rest/v1/expert_picks\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo\" -H \"Content-Type: application/json\" -d '{\"\"expert_name\"\":\"\"test\"\",\"\"source\"\":\"\"test\"\",\"\"sport\"\":\"\"nba\"\",\"\"pick_type\"\":\"\"spread\"\",\"\"pick_description\"\":\"\"test\"\",\"\"confidence\"\":\"\"alta\"\"}')",
       "Bash(npx supabase:*)",
-      "Bash(curl -s -X GET \"https://apuestazo.vercel.app/api/cron/fetch-odds\" -H \"Authorization: Bearer 4235ef19a4ed1d114ee112ad2f47ca0d773f12b489e835011fee9d7120e3b90a\")"
+      "Bash(curl -s -X GET \"https://apuestazo.vercel.app/api/cron/fetch-odds\" -H \"Authorization: Bearer 4235ef19a4ed1d114ee112ad2f47ca0d773f12b489e835011fee9d7120e3b90a\")",
+      "Bash(curl -s \"https://bhyfpijrlgsrremiaevk.supabase.co/rest/v1/events?select=id,sport_key,home_team,away_team,commence_time,completed&limit=10&order=commence_time.desc\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"https://bhyfpijrlgsrremiaevk.supabase.co/rest/v1/events?select=id,sport_key,home_team,commence_time,completed&limit=5&order=commence_time.desc\" -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo')",
+      "Bash(curl -s \"https://bhyfpijrlgsrremiaevk.supabase.co/rest/v1/odds_snapshots?select=id,event_id,bookmaker_key,market_key&limit=5\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo\")",
+      "Bash(curl -s \"https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard\")",
+      "Bash(python3 -c \":*)",
+      "Bash(curl -s \"http://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/401811003/competitions/401811003/odds/100\")"
     ]
   }
 }

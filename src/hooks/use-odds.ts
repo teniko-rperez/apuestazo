@@ -5,14 +5,24 @@ import { getClient } from "@/lib/supabase/client";
 import type { GameEvent } from "@/types/event";
 import type { LatestOdds } from "@/types/odds";
 
+function todayRange() {
+  const now = new Date();
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 async function fetchEvents(sportKey: string): Promise<GameEvent[]> {
   const supabase = getClient();
+  const { start, end } = todayRange();
   const { data, error } = await supabase
     .from("events")
     .select("*")
     .eq("sport_key", sportKey)
-    .eq("completed", false)
-    .gte("commence_time", new Date().toISOString())
+    .gte("commence_time", start)
+    .lte("commence_time", end)
     .order("commence_time", { ascending: true });
 
   if (error) throw error;
