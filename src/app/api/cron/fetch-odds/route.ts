@@ -122,9 +122,13 @@ export async function GET(request: Request) {
       const eventTeams = new Map<string, { home_team: string; away_team: string }>();
       for (const ev of eventsData ?? []) eventTeams.set(ev.id, { home_team: ev.home_team, away_team: ev.away_team });
 
+      // Fetch Kalshi/Robinhood contracts from DB
+      const { data: kalshiData } = await supabase.from('robinhood_contracts').select('*').gte('scraped_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString());
+      const kalshiContracts = (kalshiData ?? []) as unknown as import('@/lib/scrapers/kalshi').KalshiContract[];
+
       // ═══ PHASE 3: CORRELATION ENGINE ═══
-      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, eventTeams } as EngineInput);
-      summary.engineSignals = { arbs: arbs.length, evs: evs.length, experts: typedExperts.length, lineMovements: lineMovements.length, steamMoves: steamMoves.length, consensus: allConsensus.length, discrepancies: discrepancies.length, parlays: parlays.length };
+      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, eventTeams } as EngineInput);
+      summary.engineSignals = { arbs: arbs.length, evs: evs.length, experts: typedExperts.length, lineMovements: lineMovements.length, steamMoves: steamMoves.length, consensus: allConsensus.length, discrepancies: discrepancies.length, parlays: parlays.length, robinhood: kalshiContracts.length };
 
       if (engineRecs.length > 0) {
         await supabase.from('recommendations').delete().lt('valid_until', new Date().toISOString());

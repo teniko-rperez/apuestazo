@@ -83,7 +83,7 @@ export function Navbar() {
       </nav>
 
       {/* ═══ DESKTOP: Sidebar ═══ */}
-      <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-52 bg-white border-r border-border/50 z-50">
+      <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-52 bg-white border-r border-border z-50 shadow-sm">
         {/* Logo */}
         <div className="h-16 flex items-center px-5 border-b border-border/50">
           <h1 className="font-extrabold text-xl tracking-tight">

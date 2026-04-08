@@ -10,6 +10,7 @@
  * 5. Odds discrepancies across books
  * 6. Public betting consensus
  * 7. Historical simulated bet performance (feedback loop)
+ * 8. Robinhood/Kalshi prediction market prices
  */
 
 import { americanToDecimal, americanToImplied, formatOdds, formatPct } from './implied-probability';
@@ -18,6 +19,7 @@ import type { EvResult } from './expected-value';
 import type { LineMovement, SteamMove } from './line-movement';
 import type { ParlayCombo } from './parlay-builder';
 import type { ExpertPick } from '@/lib/scrapers/experts';
+import type { KalshiContract } from '@/lib/scrapers/kalshi';
 
 export interface EngineInput {
   arbs: ArbResult[];
@@ -45,6 +47,7 @@ export interface EngineInput {
     discrepancy: number;
   }>;
   parlays: ParlayCombo[];
+  kalshiContracts: KalshiContract[];
   eventTeams: Map<string, { home_team: string; away_team: string }>;
 }
 
@@ -265,6 +268,50 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
           );
         }
         break;
+      }
+    }
+  }
+
+  // ─── Signal 8: Robinhood/Kalshi Prediction Markets ───
+  // If Kalshi has a contract with high implied prob for a team, it corroborates
+  for (const contract of input.kalshiContracts) {
+    if (!contract.yes_price || contract.yes_price === 0) continue;
+
+    const impliedProb = contract.yes_price / 100;
+    const contractText = `${contract.title} ${contract.subtitle}`.toLowerCase();
+
+    for (const [eventId, teams] of input.eventTeams) {
+      const homeLC = teams.home_team.toLowerCase();
+      const awayLC = teams.away_team.toLowerCase();
+      const homeWords = homeLC.split(' ').filter((w) => w.length > 3);
+      const awayWords = awayLC.split(' ').filter((w) => w.length > 3);
+
+      const matchesHome = homeWords.some((w) => contractText.includes(w));
+      const matchesAway = awayWords.some((w) => contractText.includes(w));
+
+      if (matchesHome && impliedProb > 0.55) {
+        // Kalshi market thinks home team wins with >55% prob
+        const score = impliedProb > 0.75 ? 0.22 : impliedProb > 0.65 ? 0.18 : 0.12;
+        addSignal(eventId, 'h2h', teams.home_team, 'draftkings', 0,
+          'ROBINHOOD', score,
+          `Robinhood/Kalshi: ${teams.home_team} a ${contract.yes_price}¢ (${(impliedProb * 100).toFixed(0)}% prob)`
+        );
+      } else if (matchesAway && impliedProb > 0.55) {
+        const score = impliedProb > 0.75 ? 0.22 : impliedProb > 0.65 ? 0.18 : 0.12;
+        addSignal(eventId, 'h2h', teams.away_team, 'draftkings', 0,
+          'ROBINHOOD', score,
+          `Robinhood/Kalshi: ${teams.away_team} a ${contract.yes_price}¢ (${(impliedProb * 100).toFixed(0)}% prob)`
+        );
+      }
+
+      // Check for over/under contracts
+      const overMatch = contractText.match(/over\s+(\d+\.?\d*)\s+points/);
+      if (overMatch && (matchesHome || matchesAway) && impliedProb > 0.55) {
+        const score = impliedProb > 0.65 ? 0.18 : 0.12;
+        addSignal(eventId, 'totals', 'Over', 'draftkings', 0,
+          'ROBINHOOD', score,
+          `Robinhood/Kalshi: Over ${overMatch[1]} a ${contract.yes_price}¢ (${(impliedProb * 100).toFixed(0)}%)`
+        );
       }
     }
   }

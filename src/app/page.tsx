@@ -122,52 +122,6 @@ function SimRow({ bet }: { bet: Record<string, unknown> }) {
   );
 }
 
-/* ─── Robinhood Contract Card ─── */
-function RhCard({ contract }: { contract: Record<string, unknown> }) {
-  const yesPrice = contract.yes_price as number | null;
-  const noPrice = contract.no_price as number | null;
-  const legs = (contract.legs as string[]) ?? [];
-  const sport = contract.sport as string;
-  const vol = contract.volume as number;
-
-  return (
-    <div className="bg-white rounded-2xl p-3 shadow-sm border border-border/50">
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">ROBINHOOD</span>
-          <span className="text-[9px] text-gray-400 uppercase font-semibold">{sport}</span>
-        </div>
-        {vol > 0 && <span className="text-[9px] text-gray-400">vol: {vol}</span>}
-      </div>
-      <div className="space-y-0.5 mb-2">
-        {legs.slice(0, 4).map((leg, i) => (
-          <p key={i} className="text-[11px] text-gray-600 truncate">{leg}</p>
-        ))}
-        {legs.length > 4 && <p className="text-[10px] text-gray-400">+{legs.length - 4} mas...</p>}
-      </div>
-      <div className="flex gap-2">
-        {yesPrice != null && (
-          <div className="flex-1 bg-emerald-50 rounded-xl py-1.5 text-center">
-            <p className="text-[10px] text-emerald-600 font-semibold">YES</p>
-            <p className="text-[15px] font-bold text-emerald-700 font-mono">{yesPrice}¢</p>
-          </div>
-        )}
-        {noPrice != null && (
-          <div className="flex-1 bg-red-50 rounded-xl py-1.5 text-center">
-            <p className="text-[10px] text-red-500 font-semibold">NO</p>
-            <p className="text-[15px] font-bold text-red-600 font-mono">{noPrice}¢</p>
-          </div>
-        )}
-        {yesPrice == null && noPrice == null && (
-          <div className="flex-1 bg-gray-50 rounded-xl py-1.5 text-center">
-            <p className="text-[11px] text-gray-400">Sin precio</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ─── Section ─── */
 function Section({ title, count, href, children }: { title: string; count?: number; href?: string; children: React.ReactNode }) {
   return (
@@ -199,11 +153,6 @@ export default function Dashboard() {
     return data ?? [];
   });
 
-  const { data: rhContracts } = useSWR("rh-home", async () => {
-    const s = getClient();
-    const { data } = await s.from("robinhood_contracts").select("*").order("volume", { ascending: false }).limit(8);
-    return (data ?? []) as Array<Record<string, unknown>>;
-  });
 
   const bets = (simBets ?? []) as Array<Record<string, unknown>>;
   const totalProfit = bets.reduce((s, b) => s + ((b.profit as number) ?? 0), 0);
@@ -258,15 +207,6 @@ export default function Dashboard() {
             <Section title="Mejores Apuestas" count={recs.length} href="/valor">
               <div className="space-y-2">
                 {recs.map((r) => <RecCard key={r.id} rec={r as unknown as Record<string, unknown>} />)}
-              </div>
-            </Section>
-          )}
-
-          {/* Robinhood / Kalshi Contracts */}
-          {rhContracts && rhContracts.length > 0 && (
-            <Section title="Robinhood" count={rhContracts.length}>
-              <div className="space-y-2">
-                {rhContracts.map((c) => <RhCard key={c.ticker as string} contract={c} />)}
               </div>
             </Section>
           )}
