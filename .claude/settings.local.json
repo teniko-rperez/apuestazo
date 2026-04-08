@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init -d --base-color zinc --css-variables)",
+      "Bash(npx shadcn@latest init -d)",
+      "Bash(npx shadcn@latest add card badge table tabs skeleton separator -y)",
+      "Bash(git init:*)",
+      "Bash(git branch:*)",
+      "Bash(gh auth:*)",
+      "Bash(where vercel:*)",
+      "Bash(npm list:*)",
+      "Bash(winget install:*)"
+    ]
+  }
+}

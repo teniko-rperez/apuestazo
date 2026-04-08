@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/fetch-odds",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}
