@@ -10,7 +10,27 @@
       "Bash(gh auth:*)",
       "Bash(where vercel:*)",
       "Bash(npm list:*)",
-      "Bash(winget install:*)"
+      "Bash(winget install:*)",
+      "Bash(git config:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth status)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo create apuestazo --public --source=. --remote=origin --push)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth setup-git)",
+      "Bash(git push:*)",
+      "Bash(vercel whoami:*)",
+      "Bash(vercel --yes --prod)",
+      "Bash(vercel env:*)",
+      "Bash(where psql:*)",
+      "Bash(PGPASSWORD=\"Z7eoSLl8MRW94xsc\" psql -h db.bhyfpijrlgsrremiaevk.supabase.co -p 5432 -U postgres -d postgres -c \"SELECT 1\")",
+      "Bash(PGPASSWORD=\"Z7eoSLl8MRW94xsc\" psql -h aws-0-us-east-1.pooler.supabase.com -p 6543 -U postgres.bhyfpijrlgsrremiaevk -d postgres -c \"SELECT 1\")",
+      "Bash(PGPASSWORD=\"Z7eoSLl8MRW94xsc\" psql -h aws-0-us-east-2.pooler.supabase.com -p 6543 -U postgres.bhyfpijrlgsrremiaevk -d postgres -c \"SELECT 1\")",
+      "Bash(PGPASSWORD=\"Z7eoSLl8MRW94xsc\" psql \"postgresql://postgres@db.bhyfpijrlgsrremiaevk.supabase.co:5432/postgres\" -c \"SELECT 1\")",
+      "Bash(nslookup db.bhyfpijrlgsrremiaevk.supabase.co)",
+      "Bash(PGPASSWORD=\"Z7eoSLl8MRW94xsc\" psql -h 2600:1f16:1cd0:3341:3a47:3089:9069:8a24 -p 5432 -U postgres -d postgres -c \"SELECT 1\")",
+      "Bash(curl -s -X POST \"https://bhyfpijrlgsrremiaevk.supabase.co/rest/v1/rpc/\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo\")",
+      "WebSearch",
+      "Bash(npx next:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

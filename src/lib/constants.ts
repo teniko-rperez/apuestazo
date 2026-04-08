@@ -14,6 +14,12 @@ export const BOOKMAKERS: Record<string, { name: string; color: string }> = {
   betrivers: { name: 'BetRivers', color: '#1a1a2e' },
 };
 
+export const BOOKMAKERS_EXTRA: Record<string, { name: string; color: string }> = {
+  espnbet: { name: 'ESPN BET', color: '#ff4747' },
+};
+
+Object.assign(BOOKMAKERS, BOOKMAKERS_EXTRA);
+
 export const BOOKMAKER_KEYS = Object.keys(BOOKMAKERS);
 
 export const MARKET_LABELS: Record<string, string> = {
@@ -43,6 +49,7 @@ export const NAV_ITEMS = [
   { href: '/arbitraje', label: 'Arbitraje' },
   { href: '/valor', label: 'Valor +EV' },
   { href: '/props', label: 'Props' },
+  { href: '/expertos', label: 'Expertos' },
 ];
 
 export const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
