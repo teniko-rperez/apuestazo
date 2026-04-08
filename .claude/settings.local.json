@@ -30,7 +30,10 @@
       "WebSearch",
       "Bash(npx next:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(curl -s -X POST \"https://bhyfpijrlgsrremiaevk.supabase.co/rest/v1/expert_picks\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoeWZwaWpybGdzcnJlbWlhZXZrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjIxNywiZXhwIjoyMDkxMTgyMjE3fQ.isjCMxnArqHVji_ltBL6Ba78SEW8m_mEKFaw735iqxo\" -H \"Content-Type: application/json\" -d '{\"\"expert_name\"\":\"\"test\"\",\"\"source\"\":\"\"test\"\",\"\"sport\"\":\"\"nba\"\",\"\"pick_type\"\":\"\"spread\"\",\"\"pick_description\"\":\"\"test\"\",\"\"confidence\"\":\"\"alta\"\"}')",
+      "Bash(npx supabase:*)",
+      "Bash(curl -s -X GET \"https://apuestazo.vercel.app/api/cron/fetch-odds\" -H \"Authorization: Bearer 4235ef19a4ed1d114ee112ad2f47ca0d773f12b489e835011fee9d7120e3b90a\")"
     ]
   }
 }
