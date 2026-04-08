@@ -47,7 +47,12 @@ function useExpertPicks(sport?: string) {
 
 const SOURCE_COLORS: Record<string, string> = {
   "Covers.com": "bg-blue-100 text-blue-700",
-  "Reddit r/sportsbook": "bg-orange-100 text-orange-500",
+  "Reddit r/sportsbook": "bg-orange-100 text-orange-600",
+  "Reddit r/sportsbetting": "bg-orange-100 text-orange-600",
+  "Reddit r/NBAbetting": "bg-orange-100 text-orange-600",
+  "Reddit r/MLBbetting": "bg-orange-100 text-orange-600",
+  "Twitter/X": "bg-gray-100 text-gray-700",
+  "Action Network": "bg-blue-100 text-blue-700",
   WagerTalk: "bg-purple-100 text-purple-600",
 };
 
@@ -128,10 +133,11 @@ export default function ExpertosPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-1 text-sm">
+            <div className="space-y-1 text-xs">
               <p>Covers.com Leaderboard</p>
-              <p>Reddit r/sportsbook</p>
-              <p>Handicappers verificados</p>
+              <p>Reddit (sportsbook, NBAbetting, MLBbetting)</p>
+              <p>Twitter/X (Sharp Plays, Action Network)</p>
+              <p>Action Network RSS</p>
             </div>
           </CardContent>
         </Card>

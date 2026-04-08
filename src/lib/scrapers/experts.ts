@@ -164,10 +164,14 @@ export async function fetchRedditPicks(sport: 'nba' | 'mlb'): Promise<ExpertPick
 export async function fetchAllExpertPicks(
   sport: 'nba' | 'mlb'
 ): Promise<ExpertPick[]> {
-  const [covers, reddit] = await Promise.all([
+  // Dynamic import to avoid circular deps
+  const { fetchSocialPicks } = await import('./social');
+
+  const [covers, reddit, social] = await Promise.all([
     fetchCoversExperts(sport).catch(() => []),
     fetchRedditPicks(sport).catch(() => []),
+    fetchSocialPicks(sport).catch(() => []),
   ]);
 
-  return [...covers, ...reddit];
+  return [...covers, ...reddit, ...social];
 }
