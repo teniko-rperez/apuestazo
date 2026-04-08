@@ -17,6 +17,7 @@ interface GameCardProps {
 }
 
 export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProps) {
+  const isCompleted = event.completed;
   const gameTime = new Date(event.commence_time).toLocaleString("es-ES", {
     weekday: "short",
     month: "short",
@@ -36,11 +37,16 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
 
   return (
     <Link href={`/${sportPath}/${event.id}`}>
-      <Card className="hover:border-green-500/30 transition-colors cursor-pointer">
+      <Card className={`hover:border-green-500/30 transition-colors cursor-pointer ${isCompleted ? "opacity-70" : ""}`}>
         <CardContent className="pt-4">
           <div className="flex items-start justify-between mb-3">
             <p className="text-xs text-muted-foreground">{gameTime}</p>
             <div className="flex gap-1">
+              {isCompleted && (
+                <Badge className="bg-muted text-muted-foreground text-[10px]">
+                  FINAL
+                </Badge>
+              )}
               {hasArb && (
                 <Badge className="bg-yellow-500/20 text-yellow-400 text-[10px]">
                   ARB
@@ -59,12 +65,14 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
               team={event.away_team}
               bestOdds={bestAway?.price}
               bestBook={bestAway?.bookmaker}
+              score={event.scores?.away}
             />
             <TeamLine
               team={event.home_team}
               bestOdds={bestHome?.price}
               bestBook={bestHome?.bookmaker}
               isHome
+              score={event.scores?.home}
             />
           </div>
 
@@ -82,11 +90,13 @@ function TeamLine({
   bestOdds,
   bestBook,
   isHome,
+  score,
 }: {
   team: string;
   bestOdds?: number;
   bestBook?: string;
   isHome?: boolean;
+  score?: number;
 }) {
   return (
     <div className="flex items-center justify-between">
@@ -97,6 +107,9 @@ function TeamLine({
           </span>
         )}
         <span className="text-sm font-medium">{team}</span>
+        {score != null && (
+          <span className="text-sm font-bold text-foreground ml-1">{score}</span>
+        )}
       </div>
       {bestOdds != null && (
         <div className="text-right">
