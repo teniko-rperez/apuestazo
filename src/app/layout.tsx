@@ -38,7 +38,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Navbar />
-        <main className="flex-1 px-3 pt-3 pb-safe w-full max-w-md mx-auto">
+        {/* Mobile: full width with bottom padding for nav */}
+        {/* Desktop: offset left for sidebar, centered content */}
+        <main className="flex-1 px-3 pt-3 pb-safe w-full max-w-md mx-auto lg:max-w-6xl lg:ml-56 lg:mr-auto lg:px-8 lg:pt-6">
           {children}
         </main>
       </body>

@@ -16,11 +16,11 @@ export default function MlbPage() {
 
   return (
     <div>
-      <h1 className="text-base font-bold text-gray-800 mt-1 mb-3">⚾ MLB</h1>
+      <h1 className="text-base lg:text-xl font-bold text-gray-800 mt-1 mb-3">⚾ MLB</h1>
       {isLoading ? (
-        <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
+        <div className="space-y-2 lg:grid lg:grid-cols-3 lg:gap-3 lg:space-y-0">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
       ) : events && events.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-2 lg:grid lg:grid-cols-3 lg:gap-3 lg:space-y-0">
           {events.map((e) => (
             <GameCard key={e.id} event={e} odds={odds ?? []} sportPath="mlb" hasArb={arbIds.has(e.id)} hasEv={evIds.has(e.id)} />
           ))}

@@ -166,52 +166,60 @@ export default function Dashboard() {
   return (
     <div>
       {/* Quick Stats Strip */}
-      <div className="grid grid-cols-4 gap-1.5 mt-1">
+      <div className="grid grid-cols-4 gap-1.5 lg:gap-3 mt-1">
         {[
           { label: "ARB", value: arbs?.length ?? 0, color: "text-yellow-600" },
           { label: "+EV", value: evs?.length ?? 0, color: "text-blue-600" },
           { label: "W/L", value: `${wonCount}/${settledCount}`, color: "text-gray-800" },
           { label: "P/L", value: `${totalProfit >= 0 ? "+" : ""}$${totalProfit.toFixed(0)}`, color: totalProfit >= 0 ? "text-green-600" : "text-red-500" },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl py-2 text-center shadow-sm border border-border/50">
-            <p className={`text-[15px] font-bold font-mono ${s.color}`}>{s.value}</p>
-            <p className="text-[9px] text-gray-400 font-semibold uppercase">{s.label}</p>
+          <div key={s.label} className="bg-white rounded-xl lg:rounded-2xl py-2 lg:py-4 text-center shadow-sm border border-border/50">
+            <p className={`text-[15px] lg:text-2xl font-bold font-mono ${s.color}`}>{s.value}</p>
+            <p className="text-[9px] lg:text-xs text-gray-400 font-semibold uppercase">{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Recommendations */}
-      {recs && recs.length > 0 && (
-        <Section title="Mejores Apuestas" count={recs.length} href="/valor">
-          <div className="space-y-2">
-            {recs.map((r) => <RecCard key={r.id} rec={r as unknown as Record<string, unknown>} />)}
-          </div>
-        </Section>
-      )}
+      {/* Desktop: 2-column layout / Mobile: single column */}
+      <div className="lg:grid lg:grid-cols-5 lg:gap-6">
+        {/* Left column: Games (wider) */}
+        <div className="lg:col-span-3">
+          <Section title="Juegos" count={allEvents.length}>
+            {l1 || l2 ? (
+              <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
+            ) : allEvents.length > 0 ? (
+              <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
+                {allEvents.map((e) => <GameRow key={e.id} event={e} odds={allOdds} />)}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-border/50">
+                <p className="text-[12px] lg:text-sm text-gray-400">No hay juegos. Dale "Actualizar".</p>
+              </div>
+            )}
+          </Section>
+        </div>
 
-      {/* Games */}
-      <Section title="Juegos" count={allEvents.length}>
-        {l1 || l2 ? (
-          <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
-        ) : allEvents.length > 0 ? (
-          <div className="space-y-2">
-            {allEvents.map((e) => <GameRow key={e.id} event={e} odds={allOdds} />)}
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-border/50">
-            <p className="text-[12px] text-gray-400">No hay juegos. Dale "Actualizar".</p>
-          </div>
-        )}
-      </Section>
+        {/* Right column: Recommendations + Sims */}
+        <div className="lg:col-span-2">
+          {/* Recommendations */}
+          {recs && recs.length > 0 && (
+            <Section title="Mejores Apuestas" count={recs.length} href="/valor">
+              <div className="space-y-2">
+                {recs.map((r) => <RecCard key={r.id} rec={r as unknown as Record<string, unknown>} />)}
+              </div>
+            </Section>
+          )}
 
-      {/* Simulated Bets */}
-      {bets.length > 0 && (
-        <Section title="Simulaciones" count={bets.length} href="/simulaciones">
-          <div className="space-y-2">
-            {bets.map((b) => <SimRow key={b.id as number} bet={b} />)}
-          </div>
-        </Section>
-      )}
+          {/* Simulated Bets */}
+          {bets.length > 0 && (
+            <Section title="Simulaciones" count={bets.length} href="/simulaciones">
+              <div className="space-y-2">
+                {bets.map((b) => <SimRow key={b.id as number} bet={b} />)}
+              </div>
+            </Section>
+          )}
+        </div>
+      </div>
 
       <div className="h-4" />
     </div>
