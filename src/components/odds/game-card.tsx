@@ -1,9 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BOOKMAKERS } from "@/lib/constants";
 import { formatOdds } from "@/lib/analysis/implied-probability";
 import type { GameEvent } from "@/types/event";
 import type { LatestOdds, Outcome } from "@/types/odds";
@@ -17,126 +15,47 @@ interface GameCardProps {
 }
 
 export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProps) {
-  const isCompleted = event.completed;
-  const gameTime = new Date(event.commence_time).toLocaleString("es-ES", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  // Get h2h moneyline odds for quick display
-  const h2hOdds = odds.filter(
-    (o) => o.event_id === event.id && o.market_key === "h2h"
-  );
-
-  // Find best moneyline for each team
-  const bestHome = findBestOdds(h2hOdds, event.home_team);
-  const bestAway = findBestOdds(h2hOdds, event.away_team);
+  const h2h = odds.filter((o) => o.event_id === event.id && o.market_key === "h2h");
+  const bestHome = findBest(h2h, event.home_team);
+  const bestAway = findBest(h2h, event.away_team);
+  const time = new Date(event.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" });
 
   return (
     <Link href={`/${sportPath}/${event.id}`}>
-      <Card className={`hover:border-blue-200 transition-colors cursor-pointer ${isCompleted ? "opacity-70" : ""}`}>
-        <CardContent className="pt-4">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-xs text-muted-foreground">{gameTime}</p>
-            <div className="flex gap-1">
-              {isCompleted && (
-                <Badge className="bg-gray-100 text-gray-500 text-[10px]">
-                  FINAL
-                </Badge>
-              )}
-              {hasArb && (
-                <Badge className="bg-yellow-100 text-yellow-600 text-[10px]">
-                  ARB
-                </Badge>
-              )}
-              {hasEv && (
-                <Badge className="bg-orange-100 text-orange-500 text-[10px]">
-                  +EV
-                </Badge>
-              )}
+      <div className={`bg-white rounded-2xl p-3 shadow-sm border border-border/50 active:scale-[0.98] transition-transform ${event.completed ? "opacity-60" : ""}`}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] text-gray-400 font-medium">{time}</span>
+          <div className="flex gap-1">
+            {event.completed && <Badge className="bg-gray-100 text-gray-500 text-[9px] h-4 px-1.5">FINAL</Badge>}
+            {hasArb && <Badge className="bg-yellow-100 text-yellow-700 text-[9px] h-4 px-1.5 font-bold">ARB</Badge>}
+            {hasEv && <Badge className="bg-blue-100 text-blue-700 text-[9px] h-4 px-1.5 font-bold">+EV</Badge>}
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-medium text-gray-800 truncate flex-1">{event.away_team}</span>
+            {event.scores && <span className="text-[13px] font-bold text-gray-800 mx-2">{event.scores.away}</span>}
+            {bestAway && <span className="text-[13px] font-bold text-orange-500 font-mono">{formatOdds(bestAway.price)}</span>}
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1 flex-1">
+              <span className="text-[13px] font-medium text-gray-800 truncate">{event.home_team}</span>
+              <span className="text-[8px] text-blue-500 font-bold">HOME</span>
             </div>
+            {event.scores && <span className="text-[13px] font-bold text-gray-800 mx-2">{event.scores.home}</span>}
+            {bestHome && <span className="text-[13px] font-bold text-orange-500 font-mono">{formatOdds(bestHome.price)}</span>}
           </div>
-
-          <div className="space-y-2">
-            <TeamLine
-              team={event.away_team}
-              bestOdds={bestAway?.price}
-              bestBook={bestAway?.bookmaker}
-              score={event.scores?.away}
-            />
-            <TeamLine
-              team={event.home_team}
-              bestOdds={bestHome?.price}
-              bestBook={bestHome?.bookmaker}
-              isHome
-              score={event.scores?.home}
-            />
-          </div>
-
-          <p className="text-xs text-muted-foreground mt-3">
-            {h2hOdds.length} casas con odds
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </Link>
   );
 }
 
-function TeamLine({
-  team,
-  bestOdds,
-  bestBook,
-  isHome,
-  score,
-}: {
-  team: string;
-  bestOdds?: number;
-  bestBook?: string;
-  isHome?: boolean;
-  score?: number;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        {isHome && (
-          <span className="text-[10px] text-muted-foreground font-medium">
-            HOME
-          </span>
-        )}
-        <span className="text-sm font-medium">{team}</span>
-        {score != null && (
-          <span className="text-sm font-bold text-foreground ml-1">{score}</span>
-        )}
-      </div>
-      {bestOdds != null && (
-        <div className="text-right">
-          <span className="text-sm font-mono font-bold text-orange-500">
-            {formatOdds(bestOdds)}
-          </span>
-          {bestBook && (
-            <span className="text-[10px] text-muted-foreground ml-1">
-              {BOOKMAKERS[bestBook]?.name ?? bestBook}
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function findBestOdds(
-  odds: LatestOdds[],
-  teamName: string
-): { price: number; bookmaker: string } | null {
-  let best: { price: number; bookmaker: string } | null = null;
-  for (const row of odds) {
-    const outcome = (row.outcomes as Outcome[]).find((o) => o.name === teamName);
-    if (outcome && (!best || outcome.price > best.price)) {
-      best = { price: outcome.price, bookmaker: row.bookmaker_key };
-    }
+function findBest(odds: LatestOdds[], team: string): { price: number } | null {
+  let best: { price: number } | null = null;
+  for (const r of odds) {
+    const o = (r.outcomes as Outcome[]).find((x) => x.name === team);
+    if (o && (!best || o.price > best.price)) best = { price: o.price };
   }
   return best;
 }

@@ -11,41 +11,22 @@ export default function MlbPage() {
   const { data: arbs } = useArbitrageOpportunities("baseball_mlb");
   const { data: evs } = useEvOpportunities("baseball_mlb");
 
-  const arbEventIds = new Set(arbs?.map((a) => a.event_id) ?? []);
-  const evEventIds = new Set(evs?.map((e) => e.event_id) ?? []);
+  const arbIds = new Set(arbs?.map((a) => a.event_id) ?? []);
+  const evIds = new Set(evs?.map((e) => e.event_id) ?? []);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">MLB Baseball</h1>
-        <p className="text-muted-foreground text-sm">
-          Odds y analisis de juegos de la MLB
-        </p>
-      </div>
-
+    <div>
+      <h1 className="text-base font-bold text-gray-800 mt-1 mb-3">⚾ MLB</h1>
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-40" />
-          ))}
-        </div>
+        <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
       ) : events && events.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {events.map((event) => (
-            <GameCard
-              key={event.id}
-              event={event}
-              odds={odds ?? []}
-              sportPath="mlb"
-              hasArb={arbEventIds.has(event.id)}
-              hasEv={evEventIds.has(event.id)}
-            />
+        <div className="space-y-2">
+          {events.map((e) => (
+            <GameCard key={e.id} event={e} odds={odds ?? []} sportPath="mlb" hasArb={arbIds.has(e.id)} hasEv={evIds.has(e.id)} />
           ))}
         </div>
       ) : (
-        <p className="text-muted-foreground">
-          No hay juegos de MLB programados proximamente.
-        </p>
+        <p className="text-[12px] text-gray-400 text-center py-8">No hay juegos de MLB.</p>
       )}
     </div>
   );

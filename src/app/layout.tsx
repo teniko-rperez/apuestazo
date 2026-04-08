@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Navbar } from "@/components/layout/navbar";
 import "./globals.css";
@@ -14,9 +14,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Apuestazo - Analisis de Apuestas Deportivas",
-  description:
-    "Analisis inteligente de odds de NBA y MLB. Detecta arbitraje, apuestas +EV y las mejores oportunidades.",
+  title: "Apuestazo",
+  description: "Analisis de apuestas NBA y MLB",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#f0f2f8",
 };
 
 export default function RootLayout({
@@ -31,7 +38,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Navbar />
-        <main className="flex-1 px-4 py-4 pb-24 max-w-lg mx-auto w-full">
+        <main className="flex-1 px-3 pt-3 pb-safe w-full max-w-md mx-auto">
           {children}
         </main>
       </body>

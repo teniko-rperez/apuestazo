@@ -123,14 +123,26 @@
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   html {
     @apply font-sans;
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
 }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: oklch(0.25 0.02 240); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: oklch(0.35 0.03 240); }
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 640px) {
+  ::-webkit-scrollbar { display: none; }
+  body { -ms-overflow-style: none; scrollbar-width: none; }
+}
+@media (min-width: 641px) {
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: oklch(0.85 0.01 240); border-radius: 3px; }
+}
+
+/* Safe area for bottom nav on iPhones */
+.pb-safe { padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)); }
