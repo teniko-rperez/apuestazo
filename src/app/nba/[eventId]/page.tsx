@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OddsTable } from "@/components/odds/odds-table";
+import { GameAnalysisPanel } from "@/components/analysis/game-analysis-panel";
 import { useEvent, useEventOdds } from "@/hooks/use-odds";
 
 export default function NbaGameDetail({
@@ -42,6 +43,9 @@ export default function NbaGameDetail({
         </h1>
         <p className="text-muted-foreground text-sm">{gameTime}</p>
       </div>
+
+      {/* Analysis panel */}
+      <GameAnalysisPanel eventId={eventId} />
 
       {oddsLoading ? (
         <Skeleton className="h-64" />
