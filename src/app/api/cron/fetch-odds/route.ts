@@ -9,6 +9,7 @@ import { buildParlays } from '@/lib/analysis/parlay-builder';
 import { detectLineMovements, detectSteamMoves } from '@/lib/analysis/line-movement';
 import { generateRecommendations, type EngineInput } from '@/lib/analysis/recommendation-engine';
 import type { LatestOdds, OddsSnapshot } from '@/types/odds';
+import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
 import type { ExpertPick } from '@/lib/scrapers/experts';
 
 const SPORT_KEYS = ['basketball_nba', 'baseball_mlb'];
@@ -54,6 +55,23 @@ export async function GET(request: Request) {
       await supabase.from('poll_schedule').update({ last_polled_at: new Date().toISOString(), next_poll_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), is_game_day: true }).eq('sport_key', sportKey);
       summary[sportKey] = ss;
     }
+
+    // 1c. Scrape Kalshi/Robinhood prediction markets
+    try {
+      const kalshiMarkets = await fetchKalshiSportsMarkets();
+      if (kalshiMarkets.length > 0) {
+        await supabase.from('robinhood_contracts').delete().lt('scraped_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString());
+        await supabase.from('robinhood_contracts').insert(
+          kalshiMarkets.map((m) => ({
+            ticker: m.ticker, event_ticker: m.event_ticker, title: m.title,
+            subtitle: m.subtitle, yes_price: m.yes_price, no_price: m.no_price,
+            volume: m.volume, open_interest: m.open_interest, legs: m.legs,
+            sport: m.sport, implied_prob: m.implied_prob,
+          }))
+        );
+        summary.robinhoodContracts = kalshiMarkets.length;
+      }
+    } catch (e) { summary.kalshiError = String(e); }
 
     try { await supabase.rpc('refresh_latest_odds'); } catch { /* ok */ }
 
