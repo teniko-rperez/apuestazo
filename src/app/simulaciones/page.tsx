@@ -51,7 +51,7 @@ function useSimulatedBets() {
 }
 
 const RESULT_STYLES: Record<string, string> = {
-  won: "bg-green-500/20 text-green-400",
+  won: "bg-blue-500/20 text-blue-400",
   lost: "bg-red-500/20 text-red-400",
   push: "bg-yellow-500/20 text-yellow-400",
   pending: "bg-blue-500/20 text-blue-400",
@@ -103,7 +103,7 @@ export default function SimulacionesPage() {
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground uppercase">Ganadas</p>
-            <p className="text-2xl font-bold text-green-400">{wonBets}</p>
+            <p className="text-2xl font-bold text-blue-400">{wonBets}</p>
           </CardContent>
         </Card>
         <Card>
@@ -121,7 +121,7 @@ export default function SimulacionesPage() {
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground uppercase">Ganancia</p>
-            <p className={`text-2xl font-bold ${totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+            <p className={`text-2xl font-bold ${totalProfit >= 0 ? "text-orange-400" : "text-red-400"}`}>
               {totalProfit >= 0 ? "+" : ""}${totalProfit.toFixed(2)}
             </p>
           </CardContent>
@@ -183,7 +183,7 @@ export default function SimulacionesPage() {
                         className={`font-mono font-bold ${
                           bet.profit != null
                             ? bet.profit >= 0
-                              ? "text-green-400"
+                              ? "text-orange-400"
                               : "text-red-400"
                             : "text-muted-foreground"
                         }`}

@@ -6,7 +6,7 @@ export function ConfidenceMeter({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const color =
     score >= 0.8
-      ? "text-green-400"
+      ? "text-orange-400"
       : score >= 0.6
         ? "text-yellow-400"
         : "text-orange-400";
@@ -20,7 +20,7 @@ export function ConfidenceMeter({ score }: { score: number }) {
           className={cn(
             "h-full rounded-full transition-all",
             score >= 0.8
-              ? "bg-green-400"
+              ? "bg-blue-400"
               : score >= 0.6
                 ? "bg-yellow-400"
                 : "bg-orange-400"

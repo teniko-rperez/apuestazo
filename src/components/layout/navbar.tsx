@@ -37,7 +37,8 @@ export function Navbar() {
       {/* Top header - compact */}
       <header className="sticky top-0 z-50 bg-card border-b border-border px-4 py-2 flex items-center justify-between">
         <h1 className="font-bold text-lg">
-          <span className="text-green-400">Apuestazo</span>
+          <span className="text-blue-400">Apuesta</span>
+          <span className="text-orange-400">zo</span>
         </h1>
         <button
           onClick={handleRefresh}
@@ -45,8 +46,8 @@ export function Navbar() {
           className={cn(
             "px-3 py-1 text-xs rounded-full font-medium transition-all",
             refreshing
-              ? "bg-green-500/10 text-green-400/50"
-              : "bg-green-500/15 text-green-400 hover:bg-green-500/25 active:scale-95"
+              ? "bg-orange-500/10 text-orange-400/50"
+              : "bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 active:scale-95"
           )}
         >
           {refreshing ? "..." : "Actualizar"}
@@ -68,7 +69,7 @@ export function Navbar() {
                 className={cn(
                   "flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors min-w-[44px]",
                   isActive
-                    ? "text-green-400"
+                    ? "text-orange-400"
                     : "text-muted-foreground"
                 )}
               >

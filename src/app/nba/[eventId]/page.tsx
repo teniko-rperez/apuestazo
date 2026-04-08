@@ -33,7 +33,7 @@ export default function NbaGameDetail({
       <div>
         <Link
           href="/nba"
-          className="text-sm text-green-400 hover:underline mb-2 block"
+          className="text-sm text-blue-400 hover:underline mb-2 block"
         >
           &larr; Volver a NBA
         </Link>

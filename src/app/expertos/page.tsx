@@ -56,7 +56,7 @@ function ExpertPickCard({ pick }: { pick: ExpertPick }) {
     pick.confidence === "alta" ? 0.85 : pick.confidence === "media" ? 0.7 : 0.5;
 
   return (
-    <Card className="hover:border-green-500/30 transition-colors">
+    <Card className="hover:border-blue-500/30 transition-colors">
       <CardContent className="pt-4">
         <div className="flex items-start justify-between mb-2">
           <div>
@@ -83,7 +83,7 @@ function ExpertPickCard({ pick }: { pick: ExpertPick }) {
           {pick.profit_units != null && (
             <span
               className={
-                pick.profit_units > 0 ? "text-green-400" : "text-red-400"
+                pick.profit_units > 0 ? "text-orange-400" : "text-red-400"
               }
             >
               {pick.profit_units > 0 ? "+" : ""}
@@ -95,7 +95,7 @@ function ExpertPickCard({ pick }: { pick: ExpertPick }) {
               href={pick.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-green-400 hover:underline"
+              className="text-blue-400 hover:underline"
             >
               Ver fuente
             </a>
@@ -142,7 +142,7 @@ export default function ExpertosPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-400">
+            <p className="text-2xl font-bold text-blue-400">
               {allPicks?.length ?? 0}
             </p>
           </CardContent>

@@ -96,7 +96,7 @@ export function OddsTable({ odds, marketKey }: OddsTableProps) {
                         className={cn(
                           "text-sm font-mono",
                           isBest
-                            ? "text-green-400 font-bold"
+                            ? "text-orange-400 font-bold"
                             : "text-foreground"
                         )}
                       >

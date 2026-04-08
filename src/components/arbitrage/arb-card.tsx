@@ -45,7 +45,7 @@ export function ArbCard({ arb }: { arb: ArbitrageOpportunity }) {
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-sm font-bold text-green-400">
+                <p className="font-mono text-sm font-bold text-blue-400">
                   {formatOdds(leg.odds)}
                 </p>
                 <p className="text-xs text-muted-foreground">

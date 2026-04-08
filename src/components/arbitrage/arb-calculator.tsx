@@ -29,7 +29,7 @@ export function ArbCalculator({ arb }: { arb: ArbitrageOpportunity }) {
             type="number"
             value={bankroll}
             onChange={(e) => setBankroll(Number(e.target.value) || 0)}
-            className="w-full bg-muted rounded-md px-3 py-2 text-sm font-mono border border-border focus:border-green-500 focus:outline-none"
+            className="w-full bg-muted rounded-md px-3 py-2 text-sm font-mono border border-border focus:border-blue-500 focus:outline-none"
             min={0}
           />
         </div>
@@ -67,7 +67,7 @@ export function ArbCalculator({ arb }: { arb: ArbitrageOpportunity }) {
           <span className="text-sm text-muted-foreground">
             Ganancia garantizada:
           </span>
-          <span className="text-lg font-bold text-green-400 font-mono">
+          <span className="text-lg font-bold text-orange-400 font-mono">
             ${guaranteedProfit.toFixed(2)}
           </span>
         </div>
