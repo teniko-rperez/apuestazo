@@ -15,10 +15,10 @@ export default function ValorPage() {
   const { data: parlayRecs } = useRecommendations("parlay_leg");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Apuestas con Valor (+EV)</h1>
-        <p className="text-muted-foreground text-sm">
+        <h1 className="text-xl sm:text-2xl font-bold">Apuestas con Valor (+EV)</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Apuestas donde las odds ofrecidas son mejores que las odds justas
         </p>
       </div>
@@ -46,7 +46,7 @@ export default function ValorPage() {
             return (
               <Card
                 key={ev.id}
-                className="hover:border-green-500/30 transition-colors"
+                className="hover:border-blue-500/30 transition-colors"
               >
                 <CardContent className="pt-4">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -68,30 +68,30 @@ export default function ValorPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
                       <div className="text-center">
-                        <p className="text-xs text-muted-foreground">Odds</p>
-                        <p className="font-mono font-bold text-green-400">
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">Odds</p>
+                        <p className="font-mono font-bold text-green-400 text-sm">
                           {formatOdds(ev.odds)}
                         </p>
                       </div>
                       <div className="text-center">
-                        <p className="text-xs text-muted-foreground">
-                          Odds Justas
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">
+                          Justas
                         </p>
-                        <p className="font-mono text-muted-foreground">
+                        <p className="font-mono text-muted-foreground text-sm">
                           {formatOdds(ev.fair_odds)}
                         </p>
                       </div>
                       <div className="text-center">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">
                           Ventaja
                         </p>
-                        <p className="font-mono font-bold text-green-400">
+                        <p className="font-mono font-bold text-green-400 text-sm">
                           {formatPct(ev.edge_pct)}
                         </p>
                       </div>
-                      <div className="text-center">
+                      <div className="text-center hidden sm:block">
                         <p className="text-xs text-muted-foreground">Kelly</p>
                         <p className="font-mono text-sm">
                           {formatPct(ev.kelly_fraction)}

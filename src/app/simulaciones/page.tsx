@@ -84,44 +84,44 @@ export default function SimulacionesPage() {
     : "0.0";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Apuestas Simuladas</h1>
-        <p className="text-muted-foreground text-sm">
+        <h1 className="text-xl sm:text-2xl font-bold">Apuestas Simuladas</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Seguimiento automatico de las recomendaciones del sistema con $100 por apuesta
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground uppercase">Total</p>
-            <p className="text-2xl font-bold">{totalBets}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Total</p>
+            <p className="text-xl sm:text-2xl font-bold">{totalBets}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground uppercase">Ganadas</p>
-            <p className="text-2xl font-bold text-green-400">{wonBets}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Ganadas</p>
+            <p className="text-xl sm:text-2xl font-bold text-green-400">{wonBets}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground uppercase">Perdidas</p>
-            <p className="text-2xl font-bold text-red-400">{lostBets}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Perdidas</p>
+            <p className="text-xl sm:text-2xl font-bold text-red-400">{lostBets}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground uppercase">Win Rate</p>
-            <p className="text-2xl font-bold">{winRate}%</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Win Rate</p>
+            <p className="text-xl sm:text-2xl font-bold">{winRate}%</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground uppercase">Ganancia</p>
-            <p className={`text-2xl font-bold ${totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+            <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Ganancia</p>
+            <p className={`text-xl sm:text-2xl font-bold ${totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
               {totalProfit >= 0 ? "+" : ""}${totalProfit.toFixed(2)}
             </p>
           </CardContent>

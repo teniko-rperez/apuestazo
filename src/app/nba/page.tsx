@@ -15,22 +15,22 @@ export default function NbaPage() {
   const evEventIds = new Set(evs?.map((e) => e.event_id) ?? []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">NBA Basketball</h1>
-        <p className="text-muted-foreground text-sm">
+        <h1 className="text-xl sm:text-2xl font-bold">NBA Basketball</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Odds y analisis de juegos de la NBA
         </p>
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
           {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-40" />
+            <Skeleton key={i} className="h-36" />
           ))}
         </div>
       ) : events && events.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
           {events.map((event) => (
             <GameCard
               key={event.id}
@@ -43,7 +43,7 @@ export default function NbaPage() {
           ))}
         </div>
       ) : (
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           No hay juegos de NBA programados proximamente.
         </p>
       )}

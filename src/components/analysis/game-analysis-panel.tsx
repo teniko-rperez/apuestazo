@@ -39,12 +39,12 @@ export function GameAnalysisPanel({ eventId }: { eventId: string }) {
   return (
     <div className="space-y-4">
       {/* Summary card */}
-      <Card className="border-green-500/20">
+      <Card className="border-blue-500/20">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Analisis del Juego</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <StatBox label="Mercados" value={String(analysis.markets.length)} />
             <StatBox label="Senales" value={String(analysis.total_signals)} />
             <StatBox
@@ -59,8 +59,8 @@ export function GameAnalysisPanel({ eventId }: { eventId: string }) {
           </div>
 
           {hasBestBet && (
-            <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-              <p className="text-xs text-green-400 font-medium mb-1">
+            <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className="text-xs text-blue-400 font-medium mb-1">
                 Mejor apuesta detectada
               </p>
               <p className="text-sm font-semibold">
@@ -161,7 +161,7 @@ function BetRow({ bet }: { bet: BetAnalysis }) {
             )}
           </div>
           {bet.recommendation && (
-            <p className="text-xs text-green-400/80 mt-0.5">
+            <p className="text-xs text-blue-400/80 mt-0.5">
               {bet.recommendation}
             </p>
           )}
@@ -177,7 +177,7 @@ function BetRow({ bet }: { bet: BetAnalysis }) {
       </div>
 
       {/* Probability & edge stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 text-xs">
         <MiniStat
           label="Prob. Implicita"
           value={`${(bet.implied_probability * 100).toFixed(1)}%`}
@@ -218,7 +218,7 @@ function BetRow({ bet }: { bet: BetAnalysis }) {
             className={cn(
               "px-2 py-1 rounded text-xs font-mono",
               book.is_best
-                ? "bg-green-500/15 text-green-400 ring-1 ring-green-500/30"
+                ? "bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30"
                 : "bg-muted text-muted-foreground"
             )}
           >

@@ -21,11 +21,11 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="pt-4">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">
+      <CardContent className="pt-3 pb-3 sm:pt-4">
+        <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide">
           {title}
         </p>
-        <p className={`text-2xl font-bold mt-1 ${color ?? ""}`}>{value}</p>
+        <p className={`text-xl sm:text-2xl font-bold mt-0.5 ${color ?? ""}`}>{value}</p>
       </CardContent>
     </Card>
   );
@@ -40,20 +40,20 @@ function ApiUsageMeter() {
 
   return (
     <Card>
-      <CardContent className="pt-4">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">
+      <CardContent className="pt-3 pb-3 sm:pt-4">
+        <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide">
           Presupuesto API
         </p>
-        <div className="flex items-end gap-2 mt-1">
-          <span className="text-2xl font-bold">{data.remaining}</span>
-          <span className="text-sm text-muted-foreground mb-0.5">
+        <div className="flex items-end gap-1.5 mt-0.5">
+          <span className="text-xl sm:text-2xl font-bold">{data.remaining}</span>
+          <span className="text-xs text-muted-foreground mb-0.5">
             / {data.total}
           </span>
         </div>
-        <div className="w-full h-2 bg-muted rounded-full mt-2 overflow-hidden">
+        <div className="w-full h-1.5 bg-muted rounded-full mt-2 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
-              pct > 80 ? "bg-red-500" : pct > 50 ? "bg-yellow-500" : "bg-green-500"
+              pct > 80 ? "bg-red-500" : pct > 50 ? "bg-yellow-500" : "bg-blue-500"
             }`}
             style={{ width: `${pct}%` }}
           />
@@ -76,18 +76,18 @@ function SportSummary({ sportKey }: { sportKey: string }) {
 
   return (
     <Link href={`/${sportKey === "basketball_nba" ? "nba" : "mlb"}`}>
-      <Card className="hover:border-green-500/30 transition-colors cursor-pointer">
-        <CardContent className="pt-4 flex items-center justify-between">
+      <Card className="hover:border-blue-500/30 transition-colors cursor-pointer">
+        <CardContent className="pt-3 pb-3 sm:pt-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-3xl">{sport.emoji}</span>
+            <span className="text-2xl sm:text-3xl">{sport.emoji}</span>
             <div>
-              <p className="font-semibold">{sport.name}</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="font-semibold text-sm sm:text-base">{sport.name}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {todayGames.length} juegos hoy
               </p>
             </div>
           </div>
-          <Badge variant="secondary">{events?.length ?? 0} proximos</Badge>
+          <Badge variant="secondary" className="text-[10px] sm:text-xs">{events?.length ?? 0} proximos</Badge>
         </CardContent>
       </Card>
     </Link>
@@ -100,23 +100,23 @@ export default function Dashboard() {
   const { data: evs } = useEvOpportunities();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">
+        <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Analisis en tiempo real de apuestas deportivas
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
         <StatCard
-          title="Arbitrajes Activos"
+          title="Arbitrajes"
           value={arbs?.length ?? 0}
           color="text-yellow-400"
         />
         <StatCard
-          title="Oportunidades +EV"
+          title="+EV"
           value={evs?.length ?? 0}
           color="text-green-400"
         />
@@ -130,8 +130,8 @@ export default function Dashboard() {
 
       {/* Sports */}
       <div>
-        <h2 className="text-lg font-semibold mb-3">Deportes</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Deportes</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
           <SportSummary sportKey="basketball_nba" />
           <SportSummary sportKey="baseball_mlb" />
         </div>
@@ -139,23 +139,23 @@ export default function Dashboard() {
 
       {/* Top Recommendations */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">Mejores Apuestas de Hoy</h2>
+        <div className="flex items-center justify-between mb-2 sm:mb-3">
+          <h2 className="text-base sm:text-lg font-semibold">Mejores Apuestas</h2>
           <Link
             href="/valor"
-            className="text-sm text-green-400 hover:underline"
+            className="text-xs sm:text-sm text-blue-400 hover:underline"
           >
             Ver todas
           </Link>
         </div>
         {recsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-48" />
+              <Skeleton key={i} className="h-44" />
             ))}
           </div>
         ) : recs && recs.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
             {recs.map((rec) => (
               <BetCard key={rec.id} rec={rec} />
             ))}
@@ -163,9 +163,8 @@ export default function Dashboard() {
         ) : (
           <Card>
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">
-                No hay recomendaciones activas. Las oportunidades se actualizan
-                cada 30 minutos.
+              <p className="text-muted-foreground text-sm">
+                No hay recomendaciones activas. Se actualizan cada 30 minutos.
               </p>
             </CardContent>
           </Card>

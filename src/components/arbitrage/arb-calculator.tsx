@@ -29,7 +29,7 @@ export function ArbCalculator({ arb }: { arb: ArbitrageOpportunity }) {
             type="number"
             value={bankroll}
             onChange={(e) => setBankroll(Number(e.target.value) || 0)}
-            className="w-full bg-muted rounded-md px-3 py-2 text-sm font-mono border border-border focus:border-green-500 focus:outline-none"
+            className="w-full bg-muted rounded-lg px-3 py-2 text-sm font-mono border border-border focus:border-blue-500 focus:outline-none transition-colors"
             min={0}
           />
         </div>

@@ -30,21 +30,20 @@ export default function MlbGameDetail({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
         <Link
           href="/mlb"
-          className="text-sm text-green-400 hover:underline mb-2 block"
+          className="text-xs sm:text-sm text-blue-400 hover:underline mb-2 block"
         >
           &larr; Volver a MLB
         </Link>
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-lg sm:text-2xl font-bold">
           {event.away_team} @ {event.home_team}
         </h1>
-        <p className="text-muted-foreground text-sm">{gameTime}</p>
+        <p className="text-muted-foreground text-xs sm:text-sm">{gameTime}</p>
       </div>
 
-      {/* Analysis panel */}
       <GameAnalysisPanel eventId={eventId} />
 
       {oddsLoading ? (
@@ -67,7 +66,7 @@ export default function MlbGameDetail({
           </TabsContent>
         </Tabs>
       ) : (
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           No hay datos de odds para este juego aun.
         </p>
       )}

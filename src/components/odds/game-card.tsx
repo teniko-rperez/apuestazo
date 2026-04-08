@@ -26,21 +26,19 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
     minute: "2-digit",
   });
 
-  // Get h2h moneyline odds for quick display
   const h2hOdds = odds.filter(
     (o) => o.event_id === event.id && o.market_key === "h2h"
   );
 
-  // Find best moneyline for each team
   const bestHome = findBestOdds(h2hOdds, event.home_team);
   const bestAway = findBestOdds(h2hOdds, event.away_team);
 
   return (
     <Link href={`/${sportPath}/${event.id}`}>
-      <Card className={`hover:border-green-500/30 transition-colors cursor-pointer ${isCompleted ? "opacity-70" : ""}`}>
-        <CardContent className="pt-4">
-          <div className="flex items-start justify-between mb-3">
-            <p className="text-xs text-muted-foreground">{gameTime}</p>
+      <Card className={`hover:border-blue-500/30 transition-colors cursor-pointer ${isCompleted ? "opacity-60" : ""}`}>
+        <CardContent className="pt-3 pb-3 sm:pt-4">
+          <div className="flex items-start justify-between mb-2.5">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">{gameTime}</p>
             <div className="flex gap-1">
               {isCompleted && (
                 <Badge className="bg-muted text-muted-foreground text-[10px]">
@@ -60,7 +58,7 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <TeamLine
               team={event.away_team}
               bestOdds={bestAway?.price}
@@ -76,7 +74,7 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
             />
           </div>
 
-          <p className="text-xs text-muted-foreground mt-3">
+          <p className="text-[10px] text-muted-foreground mt-2.5">
             {h2hOdds.length} casas con odds
           </p>
         </CardContent>
@@ -99,25 +97,25 @@ function TeamLine({
   score?: number;
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-1.5 min-w-0">
         {isHome && (
-          <span className="text-[10px] text-muted-foreground font-medium">
+          <span className="text-[9px] text-blue-400/70 font-medium shrink-0">
             HOME
           </span>
         )}
-        <span className="text-sm font-medium">{team}</span>
+        <span className="text-sm font-medium truncate">{team}</span>
         {score != null && (
-          <span className="text-sm font-bold text-foreground ml-1">{score}</span>
+          <span className="text-sm font-bold text-foreground ml-1 shrink-0">{score}</span>
         )}
       </div>
       {bestOdds != null && (
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <span className="text-sm font-mono font-bold text-green-400">
             {formatOdds(bestOdds)}
           </span>
           {bestBook && (
-            <span className="text-[10px] text-muted-foreground ml-1">
+            <span className="text-[9px] text-muted-foreground ml-1 hidden sm:inline">
               {BOOKMAKERS[bestBook]?.name ?? bestBook}
             </span>
           )}

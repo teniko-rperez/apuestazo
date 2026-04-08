@@ -74,10 +74,10 @@ export default function PropsPage() {
   const groups = Array.from(grouped.values());
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Props de Jugadores</h1>
-        <p className="text-muted-foreground text-sm">
+        <h1 className="text-xl sm:text-2xl font-bold">Props de Jugadores</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Comparacion de props de jugadores entre casas de apuestas
         </p>
       </div>
@@ -85,7 +85,7 @@ export default function PropsPage() {
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : groups.length > 0 ? (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {groups.map((group, idx) => (
             <Card key={idx}>
               <CardContent className="pt-4">

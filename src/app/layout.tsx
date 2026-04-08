@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Navbar } from "@/components/layout/navbar";
 import "./globals.css";
@@ -19,6 +19,13 @@ export const metadata: Metadata = {
     "Analisis inteligente de odds de NBA y MLB. Detecta arbitraje, apuestas +EV y las mejores oportunidades.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#0a0f1a",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,7 +38,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Navbar />
-        <main className="flex-1 container mx-auto px-4 py-6">{children}</main>
+        <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+          {children}
+        </main>
       </body>
     </html>
   );

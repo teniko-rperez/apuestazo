@@ -13,10 +13,10 @@ export default function ArbitrajePage() {
   const [selected, setSelected] = useState<ArbitrageOpportunity | null>(null);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Oportunidades de Arbitraje</h1>
-        <p className="text-muted-foreground text-sm">
+        <h1 className="text-xl sm:text-2xl font-bold">Oportunidades de Arbitraje</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Apuestas con ganancia garantizada combinando diferentes casas
         </p>
       </div>
@@ -48,7 +48,7 @@ export default function ArbitrajePage() {
             ) : (
               <Card>
                 <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-muted-foreground text-xs sm:text-sm">
                     Selecciona una oportunidad para calcular stakes
                   </p>
                 </CardContent>

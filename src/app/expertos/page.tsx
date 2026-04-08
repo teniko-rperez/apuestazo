@@ -56,7 +56,7 @@ function ExpertPickCard({ pick }: { pick: ExpertPick }) {
     pick.confidence === "alta" ? 0.85 : pick.confidence === "media" ? 0.7 : 0.5;
 
   return (
-    <Card className="hover:border-green-500/30 transition-colors">
+    <Card className="hover:border-blue-500/30 transition-colors">
       <CardContent className="pt-4">
         <div className="flex items-start justify-between mb-2">
           <div>
@@ -95,7 +95,7 @@ function ExpertPickCard({ pick }: { pick: ExpertPick }) {
               href={pick.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-green-400 hover:underline"
+              className="text-blue-400 hover:underline"
             >
               Ver fuente
             </a>
@@ -112,15 +112,15 @@ export default function ExpertosPage() {
   const { data: mlbPicks } = useExpertPicks("mlb");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Picks de Expertos</h1>
-        <p className="text-muted-foreground text-sm">
+        <h1 className="text-xl sm:text-2xl font-bold">Picks de Expertos</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Picks de los mejores handicappers y comunidades con records verificados
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">
@@ -142,7 +142,7 @@ export default function ExpertosPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-400">
+            <p className="text-xl sm:text-2xl font-bold text-blue-400">
               {allPicks?.length ?? 0}
             </p>
           </CardContent>
