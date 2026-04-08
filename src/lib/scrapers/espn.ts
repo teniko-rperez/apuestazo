@@ -87,6 +87,7 @@ interface EspnOddsDetail {
 
 /**
  * Fetch events + odds for a sport from ESPN.
+ * Fetches today + tomorrow to cover all US timezones.
  */
 export async function fetchEspnScoreboard(sportKey: string): Promise<{
   events: ScrapedEvent[];
@@ -95,109 +96,122 @@ export async function fetchEspnScoreboard(sportKey: string): Promise<{
   const paths = SPORT_MAP[sportKey];
   if (!paths) return { events: [], odds: [] };
 
-  // 1. Get scoreboard for events
-  const scoreboard = await fetchJson<EspnScoreboard>(
-    `${ESPN_SCOREBOARD}/${paths.scoreboard}/scoreboard`
-  );
-  if (!scoreboard) return { events: [], odds: [] };
-
   const events: ScrapedEvent[] = [];
   const allOdds: ScrapedOdds[] = [];
+  const seenEventIds = new Set<string>();
 
-  for (const event of scoreboard.events) {
-    const comp = event.competitions[0];
-    if (!comp) continue;
+  // Fetch today and tomorrow (covers timezone differences)
+  const dates: string[] = [];
+  for (let i = 0; i <= 1; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    dates.push(d.toISOString().slice(0, 10).replace(/-/g, ''));
+  }
 
-    const home = comp.competitors.find((c) => c.homeAway === 'home');
-    const away = comp.competitors.find((c) => c.homeAway === 'away');
-    if (!home || !away) continue;
+  for (const date of dates) {
+    const scoreboard = await fetchJson<EspnScoreboard>(
+      `${ESPN_SCOREBOARD}/${paths.scoreboard}/scoreboard?dates=${date}`
+    );
+    if (!scoreboard) continue;
 
-    const statusName = comp.status.type.name;
-    const completed = statusName === 'STATUS_FINAL';
-    const eventId = `espn_${event.id}`;
+    for (const event of scoreboard.events) {
+      const comp = event.competitions[0];
+      if (!comp) continue;
 
-    events.push({
-      id: eventId,
-      sport_key: sportKey,
-      commence_time: comp.date || event.date,
-      home_team: home.team.displayName,
-      away_team: away.team.displayName,
-      completed,
-      scores:
-        home.score != null && away.score != null
-          ? { home: parseInt(home.score), away: parseInt(away.score) }
-          : null,
-    });
+      const eventId = `espn_${event.id}`;
+      if (seenEventIds.has(eventId)) continue;
+      seenEventIds.add(eventId);
 
-    // 2. Fetch odds per competition via core API
-    const oddsListUrl = `${ESPN_CORE}/${paths.core}/events/${event.id}/competitions/${comp.id}/odds`;
-    const oddsList = await fetchJson<EspnOddsResponse>(oddsListUrl);
+      const home = comp.competitors.find((c) => c.homeAway === 'home');
+      const away = comp.competitors.find((c) => c.homeAway === 'away');
+      if (!home || !away) continue;
 
-    if (oddsList?.items) {
-      for (const item of oddsList.items) {
-        const ref = item.$ref;
-        if (!ref) continue;
+      const statusName = comp.status.type.name;
+      const completed = statusName === 'STATUS_FINAL';
 
-        // Skip live odds providers (id=200+)
-        const providerIdMatch = ref.match(/odds\/(\d+)/);
-        const providerId = providerIdMatch?.[1];
-        if (!providerId || parseInt(providerId) >= 200) continue;
+      events.push({
+        id: eventId,
+        sport_key: sportKey,
+        commence_time: comp.date || event.date,
+        home_team: home.team.displayName,
+        away_team: away.team.displayName,
+        completed,
+        scores:
+          home.score != null && away.score != null
+            ? { home: parseInt(home.score), away: parseInt(away.score) }
+            : null,
+      });
 
-        const bookKey = PROVIDER_MAP[providerId];
-        if (!bookKey) continue;
+      // 2. Fetch odds per competition via core API
+      const oddsListUrl = `${ESPN_CORE}/${paths.core}/events/${event.id}/competitions/${comp.id}/odds`;
+      const oddsList = await fetchJson<EspnOddsResponse>(oddsListUrl);
 
-        const detail = await fetchJson<EspnOddsDetail>(ref);
-        if (!detail) continue;
+      if (oddsList?.items) {
+        for (const item of oddsList.items) {
+          const ref = item.$ref;
+          if (!ref) continue;
 
-        const homeName = home.team.displayName;
-        const awayName = away.team.displayName;
+          // Skip live odds providers (id=200+)
+          const providerIdMatch = ref.match(/odds\/(\d+)/);
+          const providerId = providerIdMatch?.[1];
+          if (!providerId || parseInt(providerId) >= 200) continue;
 
-        // Moneyline
-        if (detail.homeTeamOdds?.moneyLine && detail.awayTeamOdds?.moneyLine) {
-          allOdds.push({
-            event_id: eventId,
-            bookmaker_key: bookKey,
-            bookmaker_name: detail.provider.name,
-            market_key: 'h2h',
-            outcomes: [
-              { name: homeName, price: detail.homeTeamOdds.moneyLine },
-              { name: awayName, price: detail.awayTeamOdds.moneyLine },
-            ],
-          });
-        }
+          const bookKey = PROVIDER_MAP[providerId];
+          if (!bookKey) continue;
 
-        // Spread
-        if (detail.spread != null) {
-          const homeSpreadOdds = detail.homeTeamOdds?.spreadOdds ?? -110;
-          const awaySpreadOdds = detail.awayTeamOdds?.spreadOdds ?? -110;
-          allOdds.push({
-            event_id: eventId,
-            bookmaker_key: bookKey,
-            bookmaker_name: detail.provider.name,
-            market_key: 'spreads',
-            outcomes: [
-              { name: homeName, price: homeSpreadOdds, point: -detail.spread },
-              { name: awayName, price: awaySpreadOdds, point: detail.spread },
-            ],
-          });
-        }
+          const detail = await fetchJson<EspnOddsDetail>(ref);
+          if (!detail) continue;
 
-        // Totals
-        if (detail.overUnder != null) {
-          allOdds.push({
-            event_id: eventId,
-            bookmaker_key: bookKey,
-            bookmaker_name: detail.provider.name,
-            market_key: 'totals',
-            outcomes: [
-              { name: 'Over', price: detail.overOdds ?? -110, point: detail.overUnder },
-              { name: 'Under', price: detail.underOdds ?? -110, point: detail.overUnder },
-            ],
-          });
+          const homeName = home.team.displayName;
+          const awayName = away.team.displayName;
+
+          // Moneyline
+          if (detail.homeTeamOdds?.moneyLine && detail.awayTeamOdds?.moneyLine) {
+            allOdds.push({
+              event_id: eventId,
+              bookmaker_key: bookKey,
+              bookmaker_name: detail.provider.name,
+              market_key: 'h2h',
+              outcomes: [
+                { name: homeName, price: detail.homeTeamOdds.moneyLine },
+                { name: awayName, price: detail.awayTeamOdds.moneyLine },
+              ],
+            });
+          }
+
+          // Spread
+          if (detail.spread != null) {
+            const homeSpreadOdds = detail.homeTeamOdds?.spreadOdds ?? -110;
+            const awaySpreadOdds = detail.awayTeamOdds?.spreadOdds ?? -110;
+            allOdds.push({
+              event_id: eventId,
+              bookmaker_key: bookKey,
+              bookmaker_name: detail.provider.name,
+              market_key: 'spreads',
+              outcomes: [
+                { name: homeName, price: homeSpreadOdds, point: -detail.spread },
+                { name: awayName, price: awaySpreadOdds, point: detail.spread },
+              ],
+            });
+          }
+
+          // Totals
+          if (detail.overUnder != null) {
+            allOdds.push({
+              event_id: eventId,
+              bookmaker_key: bookKey,
+              bookmaker_name: detail.provider.name,
+              market_key: 'totals',
+              outcomes: [
+                { name: 'Over', price: detail.overOdds ?? -110, point: detail.overUnder },
+                { name: 'Under', price: detail.underOdds ?? -110, point: detail.overUnder },
+              ],
+            });
+          }
         }
       }
     }
-  }
+  } // end dates loop
 
   return { events, odds: allOdds };
 }
