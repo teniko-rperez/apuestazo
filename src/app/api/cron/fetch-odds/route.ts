@@ -285,17 +285,25 @@ export async function GET(request: Request) {
       summary.recommendations = engineRecs.length;
     }
 
-    // 5. Create simulated bets from top recommendations
-    const { data: newRecs } = await supabase
+    // 5. Create simulated bets — best bet per event from recommendations
+    const { data: allRecs } = await supabase
       .from('recommendations')
       .select('*')
       .gte('valid_until', new Date().toISOString())
-      .order('confidence_score', { ascending: false })
-      .limit(5);
+      .order('confidence_score', { ascending: false });
 
-    if (newRecs && newRecs.length > 0) {
-      // Check which events don't already have a simulated bet
-      for (const rec of newRecs) {
+    if (allRecs && allRecs.length > 0) {
+      // Pick best recommendation per event (highest confidence)
+      const bestPerEvent = new Map<string, typeof allRecs[0]>();
+      for (const rec of allRecs) {
+        if (!rec.event_id) continue;
+        if (!bestPerEvent.has(rec.event_id)) {
+          bestPerEvent.set(rec.event_id, rec);
+        }
+      }
+
+      let betsCreated = 0;
+      for (const [, rec] of bestPerEvent) {
         const { data: existingBet } = await supabase
           .from('simulated_bets')
           .select('id')
@@ -316,18 +324,21 @@ export async function GET(request: Request) {
             reasoning: rec.reasoning,
             result: 'pending',
           });
+          betsCreated++;
         }
       }
-      summary.simulatedBetsCreated = newRecs.length;
+      summary.simulatedBetsCreated = betsCreated;
+      summary.gamesWithBets = bestPerEvent.size;
     }
 
-    // 6. Settle completed simulated bets
+    // 6. Settle completed simulated bets (h2h, spreads, totals)
     const { data: pendingBets } = await supabase
       .from('simulated_bets')
       .select('*, events(completed, scores, home_team, away_team)')
       .eq('result', 'pending');
 
     if (pendingBets) {
+      let settled = 0;
       for (const bet of pendingBets) {
         const event = (bet as Record<string, unknown>).events as {
           completed: boolean;
@@ -338,19 +349,15 @@ export async function GET(request: Request) {
 
         if (!event?.completed || !event.scores) continue;
 
-        // Determine if bet won based on market type
         let won: boolean | null = null;
         const homeScore = event.scores.home;
         const awayScore = event.scores.away;
 
         if (bet.market_key === 'h2h') {
-          // Moneyline: did the picked team win?
           const pickedHome = bet.outcome_name === event.home_team;
           won = pickedHome ? homeScore > awayScore : awayScore > homeScore;
         } else if (bet.market_key === 'totals') {
-          // Over/Under
           const total = homeScore + awayScore;
-          // Get point from odds snapshots
           const { data: snapshot } = await supabase
             .from('odds_snapshots')
             .select('outcomes')
@@ -362,16 +369,41 @@ export async function GET(request: Request) {
           if (snapshot?.[0]) {
             const outcomes = snapshot[0].outcomes as Array<{ name: string; point?: number }>;
             const line = outcomes[0]?.point ?? 0;
-            if (bet.outcome_name === 'Over') {
-              won = total > line;
-            } else {
-              won = total < line;
+            if (line > 0) {
+              if (bet.outcome_name === 'Over') {
+                won = total > line ? true : total < line ? false : null; // push if equal
+              } else {
+                won = total < line ? true : total > line ? false : null;
+              }
+            }
+          }
+        } else if (bet.market_key === 'spreads') {
+          // Settle spread bets
+          const { data: snapshot } = await supabase
+            .from('odds_snapshots')
+            .select('outcomes')
+            .eq('event_id', bet.event_id)
+            .eq('market_key', 'spreads')
+            .order('fetched_at', { ascending: false })
+            .limit(1);
+
+          if (snapshot?.[0]) {
+            const outcomes = snapshot[0].outcomes as Array<{ name: string; point?: number }>;
+            const pickedOutcome = outcomes.find((o) => o.name === bet.outcome_name);
+            if (pickedOutcome?.point != null) {
+              const spread = pickedOutcome.point;
+              const isHome = bet.outcome_name === event.home_team;
+              const pickedScore = isHome ? homeScore : awayScore;
+              const oppScore = isHome ? awayScore : homeScore;
+              const adjustedScore = pickedScore + spread;
+              won = adjustedScore > oppScore ? true : adjustedScore < oppScore ? false : null;
             }
           }
         }
 
         if (won !== null) {
-          const decimal = bet.odds > 0 ? bet.odds / 100 : 100 / Math.abs(bet.odds);
+          // Correct American → decimal conversion
+          const decimal = bet.odds > 0 ? (bet.odds / 100) : (100 / Math.abs(bet.odds));
           const profit = won ? bet.stake * decimal : -bet.stake;
 
           await supabase
@@ -382,11 +414,21 @@ export async function GET(request: Request) {
               settled_at: new Date().toISOString(),
             })
             .eq('id', bet.id);
+          settled++;
+        } else if (won === null && event.completed) {
+          // Push (tie against the spread/total)
+          await supabase
+            .from('simulated_bets')
+            .update({
+              result: 'push',
+              profit: 0,
+              settled_at: new Date().toISOString(),
+            })
+            .eq('id', bet.id);
+          settled++;
         }
       }
-      summary.betsSettled = pendingBets.filter(
-        (b) => ((b as Record<string, unknown>).events as { completed: boolean } | null)?.completed
-      ).length;
+      summary.betsSettled = settled;
     }
 
     // 7. Expire old opportunities
