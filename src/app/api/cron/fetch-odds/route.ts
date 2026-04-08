@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { fetchEspnScoreboard } from '@/lib/scrapers/espn';
 import { fetchAllExpertPicks } from '@/lib/scrapers/experts';
+import { fetchConsensusData, findOddsDiscrepancies } from '@/lib/scrapers/odds-sites';
 import { findAllArbitrages } from '@/lib/analysis/arbitrage';
 import { findAllEvOpportunities } from '@/lib/analysis/expected-value';
 import { buildParlays } from '@/lib/analysis/parlay-builder';
-import { formatOdds, formatPct } from '@/lib/analysis/implied-probability';
-import { BOOKMAKERS } from '@/lib/constants';
-import type { LatestOdds } from '@/types/odds';
+import { detectLineMovements, detectSteamMoves } from '@/lib/analysis/line-movement';
+import { generateRecommendations, type EngineInput } from '@/lib/analysis/recommendation-engine';
+import type { LatestOdds, OddsSnapshot } from '@/types/odds';
+import type { ExpertPick } from '@/lib/scrapers/experts';
 
 const SPORT_KEYS = ['basketball_nba', 'baseball_mlb'];
 
@@ -168,75 +170,119 @@ export async function GET(request: Request) {
       }
       summary.evFound = evs.length;
 
-      // Generate recommendations
-      const recommendations: Array<{
-        event_id: string;
-        type: string;
-        market_key: string;
-        outcome_name: string;
-        bookmaker_key: string;
-        odds: number;
-        reasoning: string;
-        confidence_score: number;
-        valid_until: string;
-      }> = [];
-
-      for (const arb of arbs.slice(0, 3)) {
-        for (const leg of arb.legs) {
-          recommendations.push({
-            event_id: arb.event_id,
-            type: 'arbitrage',
-            market_key: arb.market_key,
-            outcome_name: leg.outcome_name,
-            bookmaker_key: leg.bookmaker,
-            odds: leg.odds,
-            reasoning: `Arbitraje: ${formatPct(arb.profit_margin)} ganancia garantizada. Apostar ${formatPct(leg.stake_pct)} en ${BOOKMAKERS[leg.bookmaker]?.name ?? leg.bookmaker}.`,
-            confidence_score: Math.min(0.99, 0.9 + arb.profit_margin),
-            valid_until: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-          });
-        }
-      }
-
-      for (const ev of evs.slice(0, 5)) {
-        recommendations.push({
-          event_id: ev.event_id,
-          type: 'ev',
-          market_key: ev.market_key,
-          outcome_name: ev.outcome_name,
-          bookmaker_key: ev.bookmaker_key,
-          odds: ev.odds,
-          reasoning: `Valor +EV: ${formatPct(ev.edge_pct)} ventaja. Odds ${formatOdds(ev.odds)} en ${BOOKMAKERS[ev.bookmaker_key]?.name ?? ev.bookmaker_key} vs justas ${formatOdds(ev.fair_odds)}.`,
-          confidence_score: ev.confidence === 'alta' ? 0.85 : ev.confidence === 'media' ? 0.7 : 0.55,
-          valid_until: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-        });
-      }
-
+      // Gather ALL signals for the unified recommendation engine
       const parlays = buildParlays(evs);
-      for (const parlay of parlays.slice(0, 2)) {
-        for (const leg of parlay.legs) {
-          recommendations.push({
-            event_id: leg.event_id,
-            type: 'parlay_leg',
-            market_key: leg.market_key,
-            outcome_name: leg.outcome_name,
-            bookmaker_key: leg.bookmaker_key,
-            odds: leg.odds,
-            reasoning: `Parlay en ${BOOKMAKERS[leg.bookmaker_key]?.name ?? leg.bookmaker_key}. Odds combinadas: +${parlay.combined_odds}. Ventaja: ${formatPct(parlay.combined_edge)}.`,
-            confidence_score: 0.6,
-            valid_until: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-          });
+
+      // Fetch previous snapshots for line movement detection
+      const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const { data: prevSnapshots } = await supabase
+        .from('odds_snapshots')
+        .select('*')
+        .lt('fetched_at', thirtyMinsAgo)
+        .order('fetched_at', { ascending: false })
+        .limit(500);
+
+      const { data: currentSnapshots } = await supabase
+        .from('odds_snapshots')
+        .select('*')
+        .gte('fetched_at', thirtyMinsAgo)
+        .limit(500);
+
+      const typedPrev = (prevSnapshots ?? []) as unknown as OddsSnapshot[];
+      const typedCurrent = (currentSnapshots ?? []) as unknown as OddsSnapshot[];
+      const lineMovements = detectLineMovements(typedCurrent, typedPrev);
+      const steamMoves = detectSteamMoves(lineMovements);
+      summary.lineMovements = lineMovements.length;
+      summary.steamMoves = steamMoves.length;
+
+      // Fetch consensus data for all sports
+      const allConsensus = [];
+      for (const sportKey of SPORT_KEYS) {
+        try {
+          const { consensusPicks } = await fetchConsensusData(sportKey);
+          allConsensus.push(...consensusPicks);
+        } catch {
+          // Non-critical, continue
         }
       }
+      summary.consensusData = allConsensus.length;
 
-      if (recommendations.length > 0) {
+      // Fetch odds discrepancies from stored snapshots
+      const scrapedOdds = typedCurrent.map((s) => ({
+        event_id: s.event_id,
+        bookmaker_key: s.bookmaker_key,
+        bookmaker_name: s.bookmaker_key,
+        market_key: s.market_key,
+        outcomes: s.outcomes as Array<{ name: string; price: number; point?: number }>,
+      }));
+      const discrepancies = findOddsDiscrepancies(scrapedOdds);
+      summary.discrepancies = discrepancies.length;
+
+      // Fetch all expert picks from DB (already scraped above)
+      const { data: allExpertPicks } = await supabase
+        .from('expert_picks')
+        .select('*')
+        .gte('scraped_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      const typedExperts = (allExpertPicks ?? []) as unknown as ExpertPick[];
+
+      // Build event teams map
+      const { data: events } = await supabase
+        .from('events')
+        .select('id, home_team, away_team');
+      const eventTeams = new Map<string, { home_team: string; away_team: string }>();
+      for (const ev of events ?? []) {
+        eventTeams.set(ev.id, { home_team: ev.home_team, away_team: ev.away_team });
+      }
+
+      // Run unified recommendation engine
+      const engineInput: EngineInput = {
+        arbs,
+        evs,
+        expertPicks: typedExperts,
+        lineMovements,
+        steamMoves,
+        consensus: allConsensus,
+        discrepancies,
+        parlays,
+        eventTeams,
+      };
+
+      const engineRecs = generateRecommendations(engineInput);
+      summary.engineSignals = {
+        arbs: arbs.length,
+        evs: evs.length,
+        experts: typedExperts.length,
+        lineMovements: lineMovements.length,
+        steamMoves: steamMoves.length,
+        consensus: allConsensus.length,
+        discrepancies: discrepancies.length,
+        parlays: parlays.length,
+      };
+
+      // Store recommendations
+      if (engineRecs.length > 0) {
         await supabase
           .from('recommendations')
           .delete()
           .lt('valid_until', new Date().toISOString());
 
-        await supabase.from('recommendations').insert(recommendations);
+        await supabase.from('recommendations').insert(
+          engineRecs
+            .filter((r) => r.event_id) // Skip expert-only recs without event_id
+            .map((r) => ({
+              event_id: r.event_id,
+              type: r.type === 'steam' || r.type === 'expert' ? 'value' : r.type,
+              market_key: r.market_key,
+              outcome_name: r.outcome_name,
+              bookmaker_key: r.bookmaker_key,
+              odds: r.odds,
+              reasoning: r.reasoning,
+              confidence_score: r.confidence_score,
+              valid_until: r.valid_until,
+            }))
+        );
       }
-      summary.recommendations = recommendations.length;
+      summary.recommendations = engineRecs.length;
     }
 
     // 5. Create simulated bets from top recommendations
@@ -346,7 +392,7 @@ export async function GET(request: Request) {
     // 7. Expire old opportunities
     await supabase.rpc('expire_old_opportunities');
 
-    summary.source = 'ESPN Core API + Covers + Reddit (sin API key)';
+    summary.source = 'Engine unificado: ESPN + DraftKings + Covers + Reddit + Consenso + Líneas + Discrepancias';
 
     return NextResponse.json({ success: true, summary });
   } catch (error) {
