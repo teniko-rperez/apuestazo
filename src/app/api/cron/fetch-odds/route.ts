@@ -304,7 +304,52 @@ export async function GET(request: Request) {
       summary.recommendations = engineRecs.length;
     }
 
-    // Learning runs daily via /api/cron/learn (separate cron job)
+    // ═══ PHASE 3.5: CANCEL BAD BETS (pre-game only) ═══
+    const { data: pendingBets15 } = await supabase.from('simulated_bets')
+      .select('id, event_id, outcome_name, reasoning')
+      .eq('result', 'pending');
+
+    let cancelled = 0;
+    if (pendingBets15) {
+      for (const bet of pendingBets15) {
+        // Skip if game already started
+        const { data: ev } = await supabase.from('events').select('commence_time').eq('id', bet.event_id).single();
+        if (!ev) continue;
+        if (new Date(ev.commence_time as string).getTime() <= Date.now()) continue;
+
+        // Check if this bet still has a valid recommendation
+        const { data: recs } = await supabase.from('recommendations')
+          .select('outcome_name, confidence_score')
+          .eq('event_id', bet.event_id)
+          .eq('market_key', 'h2h')
+          .gte('valid_until', new Date().toISOString())
+          .order('confidence_score', { ascending: false })
+          .limit(1);
+
+        // Cancel if: no recommendation, or recommendation changed to different team, or confidence dropped below 0.15
+        if (!recs || recs.length === 0) {
+          await supabase.from('simulated_bets').update({
+            result: 'push', profit: 0, settled_at: new Date().toISOString(),
+            reasoning: (bet.reasoning ?? '') + ' [CANCELADA: senales ya no soportan esta apuesta]',
+          }).eq('id', bet.id);
+          cancelled++;
+        } else if (recs[0].outcome_name !== bet.outcome_name) {
+          // Engine now recommends the OTHER team - cancel
+          await supabase.from('simulated_bets').update({
+            result: 'push', profit: 0, settled_at: new Date().toISOString(),
+            reasoning: (bet.reasoning ?? '') + ` [CANCELADA: engine ahora recomienda ${recs[0].outcome_name}]`,
+          }).eq('id', bet.id);
+          cancelled++;
+        } else if ((recs[0].confidence_score as number) < 0.15) {
+          await supabase.from('simulated_bets').update({
+            result: 'push', profit: 0, settled_at: new Date().toISOString(),
+            reasoning: (bet.reasoning ?? '') + ` [CANCELADA: confianza bajo a ${((recs[0].confidence_score as number) * 100).toFixed(0)}%]`,
+          }).eq('id', bet.id);
+          cancelled++;
+        }
+      }
+    }
+    summary.betsCancelled = cancelled;
 
     // ═══ PHASE 4: SIMULATED BETS (1 per game, moneyline only) ═══
     const { data: allRecs } = await supabase.from('recommendations').select('*')
