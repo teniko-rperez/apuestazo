@@ -6,6 +6,15 @@ import { formatOdds } from "@/lib/analysis/implied-probability";
 import type { GameEvent } from "@/types/event";
 import type { LatestOdds, Outcome } from "@/types/odds";
 
+const OUTDOOR_TEAMS = new Set([
+  'New York Yankees', 'New York Mets', 'Boston Red Sox', 'Los Angeles Dodgers',
+  'San Francisco Giants', 'Chicago Cubs', 'Chicago White Sox', 'Philadelphia Phillies',
+  'Atlanta Braves', 'Washington Nationals', 'Cleveland Guardians', 'Detroit Tigers',
+  'Baltimore Orioles', 'Cincinnati Reds', 'Pittsburgh Pirates', 'St. Louis Cardinals',
+  'Kansas City Royals', 'Colorado Rockies', 'San Diego Padres', 'Minnesota Twins',
+  'Los Angeles Angels', 'Oakland Athletics',
+]);
+
 interface GameCardProps {
   event: GameEvent;
   odds: LatestOdds[];
@@ -16,6 +25,7 @@ interface GameCardProps {
 
 export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProps) {
   const h2h = odds.filter((o) => o.event_id === event.id && o.market_key === "h2h");
+  const isOutdoor = event.sport_key === 'baseball_mlb' && OUTDOOR_TEAMS.has(event.home_team);
   const bestHome = findBest(h2h, event.home_team);
   const bestAway = findBest(h2h, event.away_team);
   const time = new Date(event.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" });
@@ -29,6 +39,7 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
             {event.completed && <Badge className="bg-gray-100 text-gray-500 text-[9px] h-4 px-1.5">FINAL</Badge>}
             {hasArb && <Badge className="bg-yellow-100 text-yellow-700 text-[9px] h-4 px-1.5 font-bold">ARB</Badge>}
             {hasEv && <Badge className="bg-blue-100 text-blue-700 text-[9px] h-4 px-1.5 font-bold">+EV</Badge>}
+            {isOutdoor && <Badge className="bg-sky-100 text-sky-700 text-[9px] h-4 px-1.5">OUTDOOR</Badge>}
           </div>
         </div>
         <div className="space-y-1.5">

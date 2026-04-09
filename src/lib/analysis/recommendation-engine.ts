@@ -21,6 +21,8 @@ import type { ParlayCombo } from './parlay-builder';
 import type { ExpertPick } from '@/lib/scrapers/experts';
 import type { KalshiContract } from '@/lib/scrapers/kalshi';
 import type { NbaTeamStats, MlbTeamStats } from '@/lib/scrapers/stats';
+import type { WeatherData } from '@/lib/scrapers/weather';
+import type { PolyContract } from '@/lib/scrapers/polymarket';
 
 export interface EngineInput {
   arbs: ArbResult[];
@@ -50,6 +52,8 @@ export interface EngineInput {
   parlays: ParlayCombo[];
   kalshiContracts: KalshiContract[];
   teamStats: Map<string, { win_pct: number; avg_points?: number; recent_form?: string }>;
+  weather: Map<string, WeatherData>; // eventId -> weather
+  polymarket: PolyContract[];
   eventTeams: Map<string, { home_team: string; away_team: string }>;
 }
 
@@ -342,6 +346,50 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
         addSignal(eventId, 'h2h', teams.away_team, 'draftkings', 0,
           'STATS', score,
           `Stats: ${teams.away_team} ${(awayProb * 100).toFixed(0)}% prob por win% (${(awayStats.win_pct * 100).toFixed(0)}% vs ${(homeStats.win_pct * 100).toFixed(0)}%)${form}`
+        );
+      }
+    }
+  }
+
+  // ─── Signal 10: Weather (outdoor MLB games) ───
+  for (const [eventId, weather] of input.weather) {
+    if (!weather.is_outdoor) continue;
+    const teams = input.eventTeams.get(eventId);
+    if (!teams) continue;
+
+    if (weather.impact === 'unfavorable') {
+      // Bad weather = favor under on totals
+      if (weather.wind_mph > 15 || weather.precipitation_chance > 40) {
+        addSignal(eventId, 'totals', 'Under', 'draftkings', 0,
+          'WEATHER', 0.12,
+          `Clima desfavorable: ${weather.description}. Favorece Under.`
+        );
+      }
+    }
+  }
+
+  // ─── Signal 11: Polymarket ───
+  for (const poly of input.polymarket) {
+    if (poly.yes_price <= 0) continue;
+    const question = poly.question.toLowerCase();
+
+    for (const [eventId, teams] of input.eventTeams) {
+      const homeLC = teams.home_team.toLowerCase();
+      const awayLC = teams.away_team.toLowerCase();
+      const matchesHome = homeLC.split(' ').some((w) => w.length > 3 && question.includes(w));
+      const matchesAway = awayLC.split(' ').some((w) => w.length > 3 && question.includes(w));
+
+      if (matchesHome && poly.yes_price > 0.55) {
+        const score = poly.yes_price > 0.70 ? 0.18 : 0.12;
+        addSignal(eventId, 'h2h', teams.home_team, 'draftkings', 0,
+          'POLYMARKET', score,
+          `Polymarket: ${(poly.yes_price * 100).toFixed(0)}% probabilidad`
+        );
+      } else if (matchesAway && poly.yes_price > 0.55) {
+        const score = poly.yes_price > 0.70 ? 0.18 : 0.12;
+        addSignal(eventId, 'h2h', teams.away_team, 'draftkings', 0,
+          'POLYMARKET', score,
+          `Polymarket: ${(poly.yes_price * 100).toFixed(0)}% probabilidad`
         );
       }
     }

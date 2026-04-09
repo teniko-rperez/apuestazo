@@ -11,6 +11,9 @@ import { generateRecommendations, type EngineInput } from '@/lib/analysis/recomm
 import type { LatestOdds, OddsSnapshot } from '@/types/odds';
 import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
 import { fetchNbaTeamStats, fetchMlbTeamStats } from '@/lib/scrapers/stats';
+import { fetchGameWeather } from '@/lib/scrapers/weather';
+import { fetchPolymarketSports } from '@/lib/scrapers/polymarket';
+import type { WeatherData } from '@/lib/scrapers/weather';
 import { fetchOdds as fetchTheOddsApi } from '@/lib/odds-api/client';
 import { logApiUsage, getRemainingCredits, canAffordRequest } from '@/lib/odds-api/budget-tracker';
 import type { ExpertPick } from '@/lib/scrapers/experts';
@@ -173,8 +176,29 @@ export async function GET(request: Request) {
       }
       summary.teamStats = teamStats.size;
 
-      // ═══ PHASE 3: CORRELATION ENGINE (9 signals) ═══
-      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, eventTeams } as EngineInput);
+      // Fetch weather for outdoor MLB games
+      const weatherMap = new Map<string, WeatherData>();
+      for (const [eventId, teams] of eventTeams) {
+        if (!eventId.startsWith('espn_')) continue;
+        try {
+          const { data: ev } = await supabase.from('events').select('commence_time, sport_key').eq('id', eventId).single();
+          if (ev?.sport_key === 'baseball_mlb') {
+            const w = await fetchGameWeather(teams.home_team, ev.commence_time);
+            if (w) weatherMap.set(eventId, w);
+          }
+        } catch { /* ok */ }
+      }
+      summary.weatherData = weatherMap.size;
+
+      // Fetch Polymarket sports contracts
+      let polyContracts: import('@/lib/scrapers/polymarket').PolyContract[] = [];
+      try {
+        polyContracts = await fetchPolymarketSports();
+        summary.polymarket = polyContracts.length;
+      } catch { /* ok */ }
+
+      // ═══ PHASE 3: CORRELATION ENGINE (11 signals) ═══
+      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, eventTeams } as EngineInput);
       summary.engineSignals = { arbs: arbs.length, evs: evs.length, experts: typedExperts.length, lineMovements: lineMovements.length, steamMoves: steamMoves.length, consensus: allConsensus.length, discrepancies: discrepancies.length, parlays: parlays.length, robinhood: kalshiContracts.length };
 
       if (engineRecs.length > 0) {
