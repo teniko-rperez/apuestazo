@@ -169,5 +169,32 @@ export async function fetchAllExpertPicks(
     fetchEspnPredictions(sport).catch(() => []),
   ]);
 
-  return [...reddit, ...espn, ...socialPicks];
+  const all = [...reddit, ...espn, ...socialPicks];
+
+  // If no picks found from external sources, generate from our Kalshi data
+  if (all.length === 0) {
+    try {
+      const { fetchKalshiSportsMarkets } = await import('./kalshi');
+      const contracts = await fetchKalshiSportsMarkets();
+      const now = new Date().toISOString();
+      for (const c of contracts.filter((x) => x.sport === sport).slice(0, 5)) {
+        if (c.yes_price && c.yes_price > 50) {
+          all.push({
+            expert_name: 'Kalshi Market',
+            source: 'Robinhood/Kalshi',
+            source_url: 'https://kalshi.com',
+            sport,
+            pick_type: 'moneyline',
+            pick_description: `${c.title} - ${c.yes_price}¢ YES (${c.yes_price}% prob)`,
+            confidence: c.yes_price > 70 ? 'alta' : c.yes_price > 55 ? 'media' : 'baja',
+            record: `vol: ${c.volume}`,
+            profit_units: null,
+            scraped_at: now,
+          });
+        }
+      }
+    } catch { /* ok */ }
+  }
+
+  return all;
 }
