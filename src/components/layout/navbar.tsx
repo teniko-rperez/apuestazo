@@ -115,6 +115,16 @@ export function Navbar() {
                 </svg>
               ) : "Sync"}
             </button>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className={cn(
+                "h-8 w-8 flex items-center justify-center rounded-lg transition-all active:scale-95",
+                isMoreActive || menuOpen ? "bg-orange-500 text-white" : "bg-white/10 text-white/70"
+              )}>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
           </div>
         </div>
       </header>
@@ -159,7 +169,7 @@ export function Navbar() {
       {/* ═══ MOBILE: Bottom nav ═══ */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 glass bg-white/90 border-t border-gray-200/50"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
-        <div className="grid grid-cols-5 h-16 max-w-md mx-auto">
+        <div className="grid grid-cols-4 h-16 max-w-md mx-auto">
           {NAV_ITEMS.map((n) => {
             const active = isActive(n.href);
             return (
@@ -176,21 +186,6 @@ export function Navbar() {
               </Link>
             );
           })}
-          {/* Hamburger / More button */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className={cn(
-              "flex flex-col items-center justify-center gap-1 transition-all relative",
-              isMoreActive || menuOpen ? "text-orange-500" : "text-gray-400"
-            )}>
-            {(isMoreActive || menuOpen) && (
-              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-orange-500 rounded-full" />
-            )}
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-            <span className="text-[9px] font-bold leading-none">Mas</span>
-          </button>
         </div>
       </nav>
 
