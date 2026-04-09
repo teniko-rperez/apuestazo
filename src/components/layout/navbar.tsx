@@ -83,12 +83,12 @@ export function Navbar() {
       </nav>
 
       {/* ═══ DESKTOP: Sidebar ═══ */}
-      <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-52 bg-white border-r border-border z-50 shadow-sm">
+      <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-52 bg-gray-900 z-50">
         {/* Logo */}
-        <div className="h-16 flex items-center px-5 border-b border-border/50">
+        <div className="h-16 flex items-center px-5 border-b border-gray-800">
           <h1 className="font-extrabold text-xl tracking-tight">
-            <span className="text-blue-600">Apuesta</span>
-            <span className="text-orange-500">zo</span>
+            <span className="text-blue-400">Apuesta</span>
+            <span className="text-orange-400">zo</span>
           </h1>
         </div>
 
@@ -104,8 +104,8 @@ export function Navbar() {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                   isActive
-                    ? "bg-orange-50 text-orange-600"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                    ? "bg-orange-500/20 text-orange-400"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
                 )}
               >
                 <span className="text-lg">{tab.icon}</span>
@@ -116,7 +116,7 @@ export function Navbar() {
         </nav>
 
         {/* Refresh button */}
-        <div className="p-4 border-t border-border/50">
+        <div className="p-4 border-t border-gray-800">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
