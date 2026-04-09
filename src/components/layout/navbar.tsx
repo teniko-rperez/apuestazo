@@ -46,8 +46,8 @@ export function Navbar() {
           className={cn(
             "h-7 px-3 text-[11px] rounded-full font-semibold transition-all",
             refreshing
-              ? "bg-orange-50 text-orange-300"
-              : "bg-orange-500 text-white shadow-sm active:scale-95"
+              ? "bg-gray-50 text-gray-300 border border-gray-200"
+              : "bg-white text-orange-500 border border-orange-300 shadow-sm active:scale-95"
           )}
         >
           {refreshing ? "..." : "Actualizar"}
@@ -123,8 +123,8 @@ export function Navbar() {
             className={cn(
               "w-full py-2.5 rounded-xl text-sm font-semibold transition-all",
               refreshing
-                ? "bg-orange-50 text-orange-300"
-                : "bg-orange-500 text-white shadow-sm hover:bg-orange-600 active:scale-[0.98]"
+                ? "bg-gray-50 text-gray-300 border border-gray-200"
+                : "bg-white text-orange-500 border border-orange-300 shadow-sm hover:bg-orange-50 active:scale-[0.98]"
             )}
           >
             {refreshing ? "Actualizando..." : "Actualizar Datos"}

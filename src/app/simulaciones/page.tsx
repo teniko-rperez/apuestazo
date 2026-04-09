@@ -143,7 +143,7 @@ export default function SimulacionesPage() {
             onClick={() => setTab(t.key)}
             className={`px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all active:scale-95 ${
               tab === t.key
-                ? "bg-orange-500 text-white shadow-sm"
+                ? "bg-white text-orange-500 border border-orange-300 shadow-sm"
                 : "bg-white text-gray-500 border border-border/50"
             }`}
           >
