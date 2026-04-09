@@ -318,16 +318,29 @@ export async function GET(request: Request) {
       }
       let created = 0;
       for (const [eventId, rec] of bestPerEvent) {
-        // Check no existing bet for this event (any market)
+        // Only create/update bets for games that haven't started yet
+        const { data: eventData } = await supabase.from('events').select('commence_time, completed').eq('id', eventId).single();
+        if (!eventData || eventData.completed) continue;
+        const gameStart = new Date(eventData.commence_time as string).getTime();
+        if (Date.now() > gameStart) continue; // Game already started, freeze bet
+
+        // Check if bet already exists for this event
         const { data: ex } = await supabase.from('simulated_bets').select('id').eq('event_id', eventId).limit(1);
         if (!ex || ex.length === 0) {
+          // Create new bet
           await supabase.from('simulated_bets').insert({
             event_id: rec.event_id, market_key: 'h2h',
             outcome_name: rec.outcome_name, bookmaker_key: rec.bookmaker_key,
-            odds: rec.odds, stake: 100, source: rec.type,
+            odds: rec.odds, stake: 50, source: rec.type,
             reasoning: rec.reasoning, result: 'pending',
           });
           created++;
+        } else {
+          // Update existing bet if game hasn't started (better recommendation found)
+          await supabase.from('simulated_bets').update({
+            outcome_name: rec.outcome_name, bookmaker_key: rec.bookmaker_key,
+            odds: rec.odds, source: rec.type, reasoning: rec.reasoning,
+          }).eq('event_id', eventId).eq('result', 'pending');
         }
       }
       summary.betsCreated = created;
