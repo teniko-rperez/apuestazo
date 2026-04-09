@@ -12,6 +12,7 @@ import type { LatestOdds, OddsSnapshot } from '@/types/odds';
 import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
 import { fetchNbaTeamStats, fetchMlbTeamStats } from '@/lib/scrapers/stats';
 import { detectFatigue, computeHomeAdvantage, computePace, computeAltitude, computeCLV, detectStreak, computePlayoffMotivation, type FatigueSignal, type HomeAwaySignal, type PaceSignal, type AltitudeSignal, type CLVSignal, type StreakSignal, type PlayoffSignal } from '@/lib/analysis/advanced-signals';
+import type { LearnedConfig } from '@/lib/analysis/learning-engine';
 // Learning runs daily via /api/cron/learn
 import { fetchGameWeather } from '@/lib/scrapers/weather';
 import { fetchPolymarketSports } from '@/lib/scrapers/polymarket';
@@ -32,6 +33,17 @@ export async function GET(request: Request) {
   const summary: Record<string, unknown> = {};
 
   try {
+    // Load the latest learning history to apply learned weights & thresholds
+    let learnedConfig: LearnedConfig | null = null;
+    const { data: latestLearning } = await supabase
+      .from('learning_history')
+      .select('config')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (latestLearning?.[0]?.config) {
+      learnedConfig = latestLearning[0].config as LearnedConfig;
+    }
+
     // ═══ PHASE 1: DATA COLLECTION ═══
     for (const sportKey of SPORT_KEYS) {
       const ss: Record<string, unknown> = {};
@@ -363,8 +375,17 @@ export async function GET(request: Request) {
         playoff: playoffSignals.filter((p) => p.motivation !== 'medium').length,
       };
 
-      // ═══ PHASE 3: CORRELATION ENGINE (20 signals) ═══
-      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, fatigue: fatigueSignals, homeAway: homeAwaySignals, pace: paceSignals, altitude: altitudeSignals, clv: clvSignals, streaks: streakSignals, playoff: playoffSignals, eventTeams } as EngineInput);
+      // ═══ PHASE 3: CORRELATION ENGINE (with learned config) ═══
+      if (learnedConfig) {
+        (summary as Record<string, unknown>).learnedConfig = {
+          win_rate: learnedConfig.overall_win_rate,
+          min_confidence: learnedConfig.min_confidence,
+          min_signals: learnedConfig.min_signals,
+          avoid_signals: learnedConfig.avoid_signals,
+        };
+      }
+
+      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, fatigue: fatigueSignals, homeAway: homeAwaySignals, pace: paceSignals, altitude: altitudeSignals, clv: clvSignals, streaks: streakSignals, playoff: playoffSignals, eventTeams } as EngineInput, learnedConfig);
       summary.engineSignals = { arbs: arbs.length, evs: evs.length, experts: typedExperts.length, lineMovements: lineMovements.length, steamMoves: steamMoves.length, consensus: allConsensus.length, discrepancies: discrepancies.length, parlays: parlays.length, robinhood: kalshiContracts.length };
 
       if (engineRecs.length > 0) {
@@ -484,8 +505,11 @@ export async function GET(request: Request) {
       if (!eventData || eventData.completed) continue;
       if (new Date(eventData.commence_time as string).getTime() <= Date.now()) continue;
 
-      // Skip if odds too extreme
-      if (fav.odds < -800) continue;
+      // Skip if odds too extreme (use learned thresholds or defaults)
+      const lcMaxOdds = learnedConfig?.max_odds ?? 500;
+      const lcMinOdds = learnedConfig?.min_odds ?? -800;
+      if (fav.odds < lcMinOdds) continue;
+      if (fav.odds > 0 && fav.odds > lcMaxOdds) continue;
 
       // Build reasoning from recommendation if available
       const rec = recByEvent.get(eventId);
@@ -493,6 +517,10 @@ export async function GET(request: Request) {
         ? (rec.reasoning as string)
         : `Favorito del mercado con odds ${fav.odds}. Apuesta basada en linea de apertura.`;
       const confidence = rec ? (rec.confidence_score as number) : 0.50;
+
+      // Skip if below learned minimum confidence
+      const lcMinConf = learnedConfig?.min_confidence ?? 0.12;
+      if (confidence < lcMinConf) continue;
 
       const { data: ex } = await supabase.from('simulated_bets').select('id, result').eq('event_id', eventId).limit(1);
       if (!ex || ex.length === 0) {
@@ -540,6 +568,39 @@ export async function GET(request: Request) {
         }
       }
       summary.settled = settled;
+    }
+
+    // ═══ PHASE 5: INLINE LEARNING (learn after every settlement) ═══
+    if ((summary as Record<string, unknown>).settled && ((summary as Record<string, unknown>).settled as number) > 0) {
+      try {
+        const { data: allSettled } = await supabase
+          .from('simulated_bets')
+          .select('result, profit, reasoning, odds, outcome_name, events(home_team)')
+          .in('result', ['won', 'lost', 'push'])
+          .limit(1000);
+        if (allSettled && allSettled.length >= 3) {
+          const { learnFromHistory } = await import('@/lib/analysis/learning-engine');
+          const learningInput = (allSettled ?? []).map((b: Record<string, unknown>) => ({
+            result: b.result as 'won' | 'lost' | 'push',
+            profit: (b.profit as number) ?? 0,
+            reasoning: (b.reasoning as string) ?? '',
+            odds: b.odds as number | undefined,
+            outcome_name: b.outcome_name as string | undefined,
+            home_team: ((b.events as Record<string, unknown>)?.home_team as string) ?? undefined,
+          }));
+          const newConfig = learnFromHistory(learningInput);
+          await supabase.from('learning_history').insert({
+            config: { ...newConfig, loss_analysis: newConfig.loss_analysis.slice(0, 10) },
+            signal_changes: {},
+            bets_analyzed: newConfig.total_bets_analyzed,
+            win_rate: newConfig.overall_win_rate,
+          });
+          (summary as Record<string, unknown>).inlineLearning = {
+            win_rate: `${(newConfig.overall_win_rate * 100).toFixed(1)}%`,
+            adjustments: newConfig.adjustments_made.length,
+          };
+        }
+      } catch { /* learning is non-critical */ }
     }
 
     await supabase.rpc('expire_old_opportunities');

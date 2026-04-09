@@ -14,6 +14,7 @@
  */
 
 import { americanToDecimal, americanToImplied, formatOdds, formatPct } from './implied-probability';
+import type { LearnedConfig } from './learning-engine';
 import type { ArbResult } from './arbitrage';
 import type { EvResult } from './expected-value';
 import type { LineMovement, SteamMove } from './line-movement';
@@ -84,7 +85,7 @@ export interface ScoredRecommendation {
  * Scores each potential bet by counting corroborating signals.
  * More signals agreeing = safer bet.
  */
-export function generateRecommendations(input: EngineInput): ScoredRecommendation[] {
+export function generateRecommendations(input: EngineInput, learnedConfig?: LearnedConfig | null): ScoredRecommendation[] {
   const candidates = new Map<string, {
     event_id: string;
     market_key: string;
@@ -543,18 +544,49 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
   const DATA_SIGNALS = new Set(['STATS', 'PACE', 'ALTITUDE', 'WEATHER', 'FATIGUE', 'REST', 'HOME', 'STREAK', 'REGRESSION', 'PLAYOFF', 'TANK']);
   const CROWD_SIGNALS = new Set(['EXPERT', 'ROBINHOOD', 'POLYMARKET', 'CONTRARIAN']);
 
+  // Apply learned thresholds if available
+  const minConf = learnedConfig?.min_confidence ?? 0.12;
+  const minSignals = learnedConfig?.min_signals ?? 1;
+  const minCategories = learnedConfig?.min_categories ?? 1;
+  const avoidSignals = new Set(learnedConfig?.avoid_signals ?? []);
+  const worstCombos = new Set(learnedConfig?.worst_combos ?? []);
+  const maxOdds = learnedConfig?.max_odds ?? 500;
+  const minOdds = learnedConfig?.min_odds ?? -800;
+
   for (const [, c] of candidates) {
+    // Skip if odds out of learned range
+    if (c.odds > 0 && c.odds > maxOdds) continue;
+    if (c.odds < 0 && c.odds < minOdds) continue;
+
     // Count unique signal categories (market, data, crowd)
     const hasMarket = c.signals.some((s) => MARKET_SIGNALS.has(s));
     const hasData = c.signals.some((s) => DATA_SIGNALS.has(s));
     const hasCrowd = c.signals.some((s) => CROWD_SIGNALS.has(s));
     const categoryCount = (hasMarket ? 1 : 0) + (hasData ? 1 : 0) + (hasCrowd ? 1 : 0);
 
-    // Weighted average of signal scores (higher scores weight more)
+    // Skip if not enough categories or signals (learned thresholds)
+    if (categoryCount < minCategories) continue;
+    if (c.signals.length < minSignals) continue;
+
+    // Skip if any signal is in the avoid list
+    if (c.signals.some((s) => avoidSignals.has(s))) continue;
+
+    // Skip worst signal combos
+    const combo = [...new Set(c.signals)].sort().join('+');
+    if (worstCombos.has(combo)) continue;
+
+    // Weighted average of signal scores, boosted by learned signal weights
     const sorted = [...c.scores].sort((a, b) => b - a);
-    const weightedSum = sorted.reduce((s, v, i) => s + v * (1 / (i + 1)), 0);
-    const weightTotal = sorted.reduce((s, _, i) => s + 1 / (i + 1), 0);
-    const weightedAvg = weightedSum / weightTotal;
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      const sig = c.signals[i];
+      const learnedW = learnedConfig?.signal_weights[sig] ?? (1 / (i + 1));
+      const w = learnedConfig ? learnedW : 1 / (i + 1);
+      weightedSum += sorted[i] * w;
+      weightTotal += w;
+    }
+    const weightedAvg = weightTotal > 0 ? weightedSum / weightTotal : 0;
 
     // Correlation multiplier: diversity of signal categories matters most
     // 1 category = 1x, 2 categories = 1.5x, 3 categories = 2.2x
@@ -566,8 +598,8 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
     // Final confidence
     const confidence = Math.min(0.98, weightedAvg * diversityBonus * volumeBonus);
 
-    // Skip low confidence
-    if (confidence < 0.12) continue;
+    // Skip below learned minimum confidence
+    if (confidence < minConf) continue;
 
     // Determine type
     let type = 'value';

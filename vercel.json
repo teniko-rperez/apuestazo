@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/fetch-odds",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/learn",
+      "schedule": "0 6 * * *"
     }
   ]
 }
