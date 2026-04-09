@@ -7,36 +7,43 @@ import { getClient } from "@/lib/supabase/client";
 interface SignalDef {
   id: number;
   name: string;
+  key: string; // matches DEFAULT_WEIGHTS key in learning-engine
   icon: string;
   source: string;
   description: string;
-  weight: string;
+  rawWeight: number;
   apiKey: boolean;
   status: "active" | "beta";
 }
 
 const SIGNALS: SignalDef[] = [
-  { id: 1, name: "+EV Edge", icon: "📊", source: "The Odds API + ESPN", description: "Detecta apuestas donde las odds ofrecidas son mejores que las odds justas. Usa power devig para eliminar el vig y encontrar valor real.", weight: "Alta (0.30 alta, 0.20 media, 0.12 baja)", apiKey: true, status: "active" },
-  { id: 2, name: "Arbitraje", icon: "💰", source: "Multi-bookmaker", description: "Encuentra combinaciones de apuestas en diferentes casas que garantizan ganancia sin importar el resultado. Requiere 2+ bookmakers.", weight: "Alta (0.25)", apiKey: false, status: "active" },
-  { id: 3, name: "Steam Moves", icon: "🔥", source: "Line tracking", description: "Detecta cuando 3+ casas de apuestas mueven las lineas en la misma direccion simultaneamente. Indica dinero inteligente (sharp money).", weight: "Alta (0.18-0.25)", apiKey: false, status: "active" },
-  { id: 4, name: "Line Movement", icon: "📈", source: "Odds snapshots", description: "Monitorea cambios significativos en las lineas. Movimiento a la baja en odds = el mercado cree que ese resultado es mas probable.", weight: "Baja (0.10)", apiKey: false, status: "active" },
-  { id: 5, name: "Expert Consensus", icon: "👥", source: "Covers, Reddit, Twitter/X", description: "Agrega picks de handicappers verificados y comunidades de apuestas. Cuando 2+ expertos coinciden en un pick, la senal se fortalece.", weight: "Media (0.15-0.22)", apiKey: false, status: "active" },
-  { id: 6, name: "Odds Discrepancies", icon: "⚡", source: "Cross-book comparison", description: "Compara odds entre 6 bookmakers. Discrepancias >30 centavos indican que una casa tiene una opinion diferente al mercado.", weight: "Baja (0.12)", apiKey: false, status: "active" },
-  { id: 7, name: "Contrarian Value", icon: "🔄", source: "ESPN public betting %", description: "Cuando el publico apuesta pesado en un lado (>65%), el otro lado historicamente tiene valor. Fade the public.", weight: "Baja (0.10)", apiKey: false, status: "active" },
-  { id: 8, name: "Robinhood/Kalshi", icon: "📱", source: "Kalshi public API", description: "Precios de contratos de prediccion que representan probabilidades implicitas del mercado. Compara vs sportsbooks para encontrar edge.", weight: "Media (0.12-0.22)", apiKey: false, status: "active" },
-  { id: 9, name: "Team Stats", icon: "📋", source: "balldontlie + MLB Stats API", description: "Win%, puntos promedio, racha reciente. Usa metodo Log5 para estimar probabilidad de victoria basada en stats.", weight: "Media (0.14-0.20)", apiKey: true, status: "active" },
-  { id: 10, name: "Weather", icon: "🌦️", source: "Open-Meteo (gratis)", description: "Para juegos MLB outdoor: viento >15mph y lluvia >40% favorecen Under. Temperatura extrema afecta rendimiento.", weight: "Baja (0.12)", apiKey: false, status: "active" },
-  { id: 11, name: "Polymarket", icon: "🔮", source: "Polymarket CLOB API", description: "Mercado de predicciones crypto. Precios reflejan consenso de traders sofisticados sobre probabilidades de eventos.", weight: "Baja (0.12-0.18)", apiKey: false, status: "active" },
-  { id: 12, name: "Injuries", icon: "🏥", source: "ESPN injuries API", description: "Monitorea jugadores lesionados, cuestionables o fuera. Un star player out puede mover lineas 3-5 puntos.", weight: "Media (0.15-0.22)", apiKey: false, status: "beta" },
-  { id: 13, name: "Back-to-Back / Fatiga", icon: "😴", source: "ESPN schedule", description: "Equipos jugando en back-to-back (<28h descanso) rinden 3-5% menos. El oponente descansado tiene ventaja.", weight: "Media (0.14)", apiKey: false, status: "active" },
-  { id: 14, name: "Home/Away", icon: "🏟️", source: "Historico", description: "NBA equipos ganan 58% en casa, MLB 54%. Ventaja de cancha/campo aplicada a todos los juegos.", weight: "Baja (0.08)", apiKey: false, status: "active" },
-  { id: 15, name: "Pace of Play", icon: "⏱️", source: "NBA stats", description: "Ritmo de juego (posesiones/48min). Fast pace = mas puntos = OVER. Slow pace = UNDER. Senal #1 para totals.", weight: "Alta (0.16)", apiKey: false, status: "active" },
-  { id: 16, name: "Altitude / Park Factor", icon: "⛰️", source: "Hardcoded", description: "Coors Field (5,280ft): bola viaja 5-10% mas lejos = OVER. Park factors de 0.91 a 1.38 por estadio MLB.", weight: "Media-Alta (0.12-0.20)", apiKey: false, status: "active" },
-  { id: 17, name: "Head-to-Head", icon: "🤝", source: "ESPN", description: "Historial directo entre equipos. Algunos matchups favorecen consistentemente a un equipo.", weight: "Baja (0.10)", apiKey: false, status: "beta" },
-  { id: 18, name: "Closing Line Value", icon: "📉", source: "Odds snapshots", description: "Compara odds de apertura vs actuales. Si la linea se movio a tu favor = sharps de acuerdo contigo.", weight: "Alta (0.18)", apiKey: false, status: "active" },
-  { id: 19, name: "Streaks / Regresion", icon: "🔥", source: "Resultados recientes", description: "Rachas calientes/frias y deteccion de regresion. Equipos con >75% win rate en ultimos 10 juegos tienden a regresar.", weight: "Baja (0.10-0.12)", apiKey: false, status: "active" },
-  { id: 20, name: "Playoff Motivation", icon: "🏆", source: "Standings", description: "Equipos peleando por playoffs muestran motivacion elevada. Eliminados descansan jugadores.", weight: "Media (0.12-0.14)", apiKey: false, status: "active" },
+  { id: 1, key: "EV", name: "+EV Edge", icon: "📊", source: "The Odds API + ESPN", description: "Detecta apuestas donde las odds ofrecidas son mejores que las odds justas. Usa power devig para eliminar el vig y encontrar valor real.", rawWeight: 0.30, apiKey: true, status: "active" },
+  { id: 2, key: "ARB", name: "Arbitraje", icon: "💰", source: "Multi-bookmaker", description: "Encuentra combinaciones de apuestas en diferentes casas que garantizan ganancia sin importar el resultado. Requiere 2+ bookmakers.", rawWeight: 0.25, apiKey: false, status: "active" },
+  { id: 3, key: "STEAM", name: "Steam Moves", icon: "🔥", source: "Line tracking", description: "Detecta cuando 3+ casas de apuestas mueven las lineas en la misma direccion simultaneamente. Indica dinero inteligente (sharp money).", rawWeight: 0.20, apiKey: false, status: "active" },
+  { id: 4, key: "LINE_MOVE", name: "Line Movement", icon: "📈", source: "Odds snapshots", description: "Monitorea cambios significativos en las lineas. Movimiento a la baja en odds = el mercado cree que ese resultado es mas probable.", rawWeight: 0.10, apiKey: false, status: "active" },
+  { id: 5, key: "EXPERT", name: "Expert Consensus", icon: "👥", source: "Covers, Reddit, Twitter/X", description: "Agrega picks de handicappers verificados y comunidades de apuestas. Cuando 2+ expertos coinciden en un pick, la senal se fortalece.", rawWeight: 0.18, apiKey: false, status: "active" },
+  { id: 6, key: "DISCREPANCY", name: "Odds Discrepancies", icon: "⚡", source: "Cross-book comparison", description: "Compara odds entre 6 bookmakers. Discrepancias >30 centavos indican que una casa tiene una opinion diferente al mercado.", rawWeight: 0.12, apiKey: false, status: "active" },
+  { id: 7, key: "CONTRARIAN", name: "Contrarian Value", icon: "🔄", source: "ESPN public betting %", description: "Cuando el publico apuesta pesado en un lado (>65%), el otro lado historicamente tiene valor. Fade the public.", rawWeight: 0.10, apiKey: false, status: "active" },
+  { id: 8, key: "ROBINHOOD", name: "Robinhood/Kalshi", icon: "📱", source: "Kalshi public API", description: "Precios de contratos de prediccion que representan probabilidades implicitas del mercado. Compara vs sportsbooks para encontrar edge.", rawWeight: 0.16, apiKey: false, status: "active" },
+  { id: 9, key: "STATS", name: "Team Stats", icon: "📋", source: "balldontlie + MLB Stats API", description: "Win%, puntos promedio, racha reciente. Usa metodo Log5 para estimar probabilidad de victoria basada en stats.", rawWeight: 0.16, apiKey: true, status: "active" },
+  { id: 10, key: "WEATHER", name: "Weather", icon: "🌦️", source: "Open-Meteo (gratis)", description: "Para juegos MLB outdoor: viento >15mph y lluvia >40% favorecen Under. Temperatura extrema afecta rendimiento.", rawWeight: 0.12, apiKey: false, status: "active" },
+  { id: 11, key: "POLYMARKET", name: "Polymarket", icon: "🔮", source: "Polymarket CLOB API", description: "Mercado de predicciones crypto. Precios reflejan consenso de traders sofisticados sobre probabilidades de eventos.", rawWeight: 0.14, apiKey: false, status: "active" },
+  { id: 12, key: "INJURY", name: "Injuries", icon: "🏥", source: "ESPN injuries API", description: "Monitorea jugadores lesionados, cuestionables o fuera. Un star player out puede mover lineas 3-5 puntos.", rawWeight: 0.15, apiKey: false, status: "beta" },
+  { id: 13, key: "FATIGUE", name: "Back-to-Back / Fatiga", icon: "😴", source: "ESPN schedule", description: "Equipos jugando en back-to-back (<28h descanso) rinden 3-5% menos. El oponente descansado tiene ventaja.", rawWeight: 0.14, apiKey: false, status: "active" },
+  { id: 14, key: "HOME", name: "Home/Away", icon: "🏟️", source: "Historico", description: "NBA equipos ganan 58% en casa, MLB 54%. Ventaja de cancha/campo aplicada a todos los juegos.", rawWeight: 0.08, apiKey: false, status: "active" },
+  { id: 15, key: "PACE", name: "Pace of Play", icon: "⏱️", source: "NBA stats", description: "Ritmo de juego (posesiones/48min). Fast pace = mas puntos = OVER. Slow pace = UNDER. Senal #1 para totals.", rawWeight: 0.16, apiKey: false, status: "active" },
+  { id: 16, key: "ALTITUDE", name: "Altitude / Park Factor", icon: "⛰️", source: "Hardcoded", description: "Coors Field (5,280ft): bola viaja 5-10% mas lejos = OVER. Park factors de 0.91 a 1.38 por estadio MLB.", rawWeight: 0.14, apiKey: false, status: "active" },
+  { id: 17, key: "H2H", name: "Head-to-Head", icon: "🤝", source: "ESPN", description: "Historial directo entre equipos. Algunos matchups favorecen consistentemente a un equipo.", rawWeight: 0.10, apiKey: false, status: "beta" },
+  { id: 18, key: "CLV", name: "Closing Line Value", icon: "📉", source: "Odds snapshots", description: "Compara odds de apertura vs actuales. Si la linea se movio a tu favor = sharps de acuerdo contigo.", rawWeight: 0.18, apiKey: false, status: "active" },
+  { id: 19, key: "STREAK", name: "Streaks / Regresion", icon: "🔥", source: "Resultados recientes", description: "Rachas calientes/frias y deteccion de regresion. Equipos con >75% win rate en ultimos 10 juegos tienden a regresar.", rawWeight: 0.10, apiKey: false, status: "active" },
+  { id: 20, key: "PLAYOFF", name: "Playoff Motivation", icon: "🏆", source: "Standings", description: "Equipos peleando por playoffs muestran motivacion elevada. Eliminados descansan jugadores.", rawWeight: 0.14, apiKey: false, status: "active" },
 ];
+
+const TOTAL_RAW_WEIGHT = SIGNALS.reduce((s, sig) => s + sig.rawWeight, 0);
+
+function getSignalPercent(rawWeight: number): number {
+  return (rawWeight / TOTAL_RAW_WEIGHT) * 100;
+}
 
 function useEngineStats() {
   return useSWR("engine-stats", async () => {
@@ -106,11 +113,17 @@ export default function EnginePage() {
   const { data: stats } = useEngineStats();
   const { data: history } = useLearningHistory();
 
+  // Extract learned weights from most recent learning run
+  const latestConfig = history?.[0]?.config as Record<string, unknown> | undefined;
+  const latestLearnedWeights = latestConfig?.signal_weights as Record<string, number> | undefined;
+  const latestAvoidSignals = latestConfig?.avoid_signals as string[] | undefined;
+
   return (
     <div>
       <h1 className="text-base lg:text-xl font-bold text-gray-800 mt-1 mb-1">Engine Matrix</h1>
       <p className="text-[11px] text-gray-400 mb-4">
         {SIGNALS.length} senales + auto-aprendizaje para encontrar las apuestas mas seguras
+        {latestLearnedWeights && <span className="text-orange-500 font-medium"> (pesos ajustados por learning)</span>}
       </p>
 
       {/* How it works */}
@@ -151,8 +164,18 @@ export default function EnginePage() {
       <div className="space-y-2">
         {SIGNALS.map((sig) => {
           const count = stats?.signalCounts[sig.name] ?? 0;
+          // Use learned weight if available, otherwise default
+          const learnedWeight = latestLearnedWeights?.[sig.key];
+          const effectiveWeight = learnedWeight ?? sig.rawWeight;
+          const effectiveTotal = latestLearnedWeights
+            ? SIGNALS.reduce((s, si) => s + (latestLearnedWeights[si.key] ?? si.rawWeight), 0)
+            : TOTAL_RAW_WEIGHT;
+          const pct = (effectiveWeight / effectiveTotal) * 100;
+          const isAvoided = latestAvoidSignals?.includes(sig.key);
+          const changed = learnedWeight != null && Math.abs(learnedWeight - sig.rawWeight) > 0.01;
+
           return (
-            <div key={sig.id} className="bg-white rounded-2xl p-3 shadow-sm border border-border/50">
+            <div key={sig.id} className={`bg-white rounded-2xl p-3 shadow-sm border ${isAvoided ? "border-red-200 bg-red-50/30" : "border-border/50"}`}>
               <div className="flex items-start gap-3">
                 <span className="text-2xl">{sig.icon}</span>
                 <div className="flex-1 min-w-0">
@@ -164,18 +187,43 @@ export default function EnginePage() {
                     {sig.apiKey && (
                       <Badge className="bg-gray-100 text-gray-500 text-[8px] h-4 px-1">API KEY</Badge>
                     )}
+                    {isAvoided && (
+                      <Badge className="bg-red-100 text-red-600 text-[8px] h-4 px-1">EVITAR</Badge>
+                    )}
                     {count > 0 && (
                       <Badge className="bg-orange-100 text-orange-600 text-[8px] h-4 px-1">{count} activas</Badge>
                     )}
                   </div>
                   <p className="text-[10px] text-blue-600 font-medium mb-1">{sig.source}</p>
                   <p className="text-[11px] text-gray-500 leading-relaxed">{sig.description}</p>
-                  <p className="text-[10px] text-gray-400 mt-1">Peso: {sig.weight}</p>
+                  {/* Weight percentage bar */}
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${isAvoided ? "bg-red-400" : pct >= 8 ? "bg-orange-500" : pct >= 5 ? "bg-blue-500" : "bg-gray-400"}`}
+                        style={{ width: `${Math.min(pct * 5, 100)}%` }}
+                      />
+                    </div>
+                    <span className={`text-[12px] font-bold font-mono min-w-[40px] text-right ${isAvoided ? "text-red-500" : "text-orange-600"}`}>
+                      {pct.toFixed(1)}%
+                    </span>
+                    {changed && (
+                      <span className={`text-[9px] font-bold ${(learnedWeight ?? 0) > sig.rawWeight ? "text-green-600" : "text-red-500"}`}>
+                        {(learnedWeight ?? 0) > sig.rawWeight ? "▲" : "▼"}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
+        <div className="bg-gray-50 rounded-xl px-3 py-2 text-center">
+          <span className="text-[10px] text-gray-400 font-bold">TOTAL DE PESOS = 100.0%</span>
+          {latestLearnedWeights && (
+            <span className="text-[9px] text-orange-500 ml-2">Ajustado por auto-aprendizaje</span>
+          )}
+        </div>
       </div>
 
       {/* Learning History */}
