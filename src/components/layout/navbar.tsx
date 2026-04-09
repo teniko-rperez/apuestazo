@@ -151,7 +151,7 @@ export function Navbar() {
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className={cn(
-                "h-11 w-11 flex items-center justify-center rounded-2xl transition-all duration-300 active:scale-85",
+                "relative h-11 px-5 flex items-center justify-center gap-2.5 rounded-2xl transition-all duration-300 active:scale-90",
                 menuOpen
                   ? "bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-xl shadow-orange-500/40 scale-105"
                   : isMoreActive
@@ -172,6 +172,7 @@ export function Navbar() {
                   menuOpen ? "w-5 -rotate-45 translate-y-0" : "w-4 translate-y-[7px]"
                 )} />
               </div>
+              <span className="text-[11px] font-bold tracking-wide">{menuOpen ? "Cerrar" : "Menu"}</span>
               {/* Notification dot when on a "more" page */}
               {isMoreActive && !menuOpen && (
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 ring-2 ring-[#0f172a] animate-pulse" />
