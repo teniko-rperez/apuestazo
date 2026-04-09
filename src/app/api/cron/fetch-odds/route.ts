@@ -82,12 +82,14 @@ export async function GET(request: Request) {
       const sport = sportKey === 'basketball_nba' ? 'nba' : 'mlb';
       try {
         const picks = await fetchAllExpertPicks(sport as 'nba' | 'mlb');
+        ss.expertPicksFound = picks.length;
         if (picks.length > 0) {
           await supabase.from('expert_picks').delete().eq('sport', sport).lt('scraped_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-          await supabase.from('expert_picks').insert(picks);
-          ss.expertPicks = picks.length;
+          const { error: insertErr } = await supabase.from('expert_picks').insert(picks);
+          if (insertErr) ss.expertInsertError = insertErr.message;
+          else ss.expertPicks = picks.length;
         }
-      } catch { /* ok */ }
+      } catch (e) { ss.expertError = String(e); }
 
       await supabase.from('poll_schedule').update({ last_polled_at: new Date().toISOString(), next_poll_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), is_game_day: true }).eq('sport_key', sportKey);
       summary[sportKey] = ss;
