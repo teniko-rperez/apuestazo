@@ -447,12 +447,19 @@ export async function GET(request: Request) {
         const { data: eventData } = await supabase.from('events').select('commence_time, completed').eq('id', eventId).single();
         if (!eventData || eventData.completed) continue;
         const gameStart = new Date(eventData.commence_time as string).getTime();
-        if (Date.now() > gameStart) continue; // Game already started, freeze bet
+        if (Date.now() > gameStart) continue;
 
-        // Check if bet already exists for this event
+        // Skip extreme odds (learned from losses)
+        const odds = rec.odds as number;
+        if (odds > 0 && odds > 300) continue; // Skip big underdogs
+        if (odds < 0 && odds < -500) continue; // Skip extreme favorites (low payout)
+        if (odds === 0) continue;
+
+        // Skip low confidence
+        if ((rec.confidence_score as number) < 0.20) continue;
+
         const { data: ex } = await supabase.from('simulated_bets').select('id').eq('event_id', eventId).limit(1);
         if (!ex || ex.length === 0) {
-          // Create new bet
           await supabase.from('simulated_bets').insert({
             event_id: rec.event_id, market_key: 'h2h',
             outcome_name: rec.outcome_name, bookmaker_key: rec.bookmaker_key,
