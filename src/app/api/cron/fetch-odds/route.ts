@@ -91,6 +91,27 @@ export async function GET(request: Request) {
         }
       } catch (e) { ss.expertError = String(e); }
 
+      // Fallback: create expert picks from Kalshi contracts already in DB
+      if (!ss.expertPicks) {
+        try {
+          const { data: kalshi } = await supabase.from('robinhood_contracts').select('*').eq('sport', sport).gte('scraped_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()).limit(10);
+          if (kalshi && kalshi.length > 0) {
+            const now = new Date().toISOString();
+            const kalshiPicks = kalshi.filter((c: Record<string, unknown>) => (c.yes_price as number) > 50).map((c: Record<string, unknown>) => ({
+              expert_name: 'Kalshi Market', source: 'Robinhood/Kalshi', source_url: 'https://kalshi.com',
+              sport, pick_type: 'moneyline',
+              pick_description: `${(c.title as string).slice(0, 150)} - ${c.yes_price}¢ (${c.yes_price}% prob)`,
+              confidence: (c.yes_price as number) > 70 ? 'alta' : (c.yes_price as number) > 55 ? 'media' : 'baja' as const,
+              record: `vol: ${c.volume}`, profit_units: null, scraped_at: now,
+            }));
+            if (kalshiPicks.length > 0) {
+              await supabase.from('expert_picks').insert(kalshiPicks);
+              ss.expertPicksKalshi = kalshiPicks.length;
+            }
+          }
+        } catch { /* ok */ }
+      }
+
       await supabase.from('poll_schedule').update({ last_polled_at: new Date().toISOString(), next_poll_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), is_game_day: true }).eq('sport_key', sportKey);
       summary[sportKey] = ss;
     }
