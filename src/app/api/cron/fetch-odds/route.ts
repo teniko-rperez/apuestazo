@@ -51,19 +51,29 @@ export async function GET(request: Request) {
         // Cross-update: sync ESPN scores to Odds API events (different IDs, same games)
         const completedEspn = events.filter((e) => e.completed && e.scores);
         if (completedEspn.length > 0) {
+          // Get all non-ESPN incomplete events
+          const { data: oddsApiEvents } = await supabase.from('events')
+            .select('id, home_team, away_team')
+            .eq('completed', false)
+            .not('id', 'like', 'espn_%');
+
+          let crossCount = 0;
           for (const espnEv of completedEspn) {
-            // Find matching Odds API event by team names
-            const { data: oddsApiEvents } = await supabase.from('events')
-              .select('id')
-              .eq('home_team', espnEv.home_team)
-              .eq('away_team', espnEv.away_team)
-              .eq('completed', false)
-              .not('id', 'like', 'espn_%');
+            // Fuzzy match: check if last word of team name matches
+            const espnHomeLast = espnEv.home_team.split(' ').pop()?.toLowerCase() ?? '';
+            const espnAwayLast = espnEv.away_team.split(' ').pop()?.toLowerCase() ?? '';
+
             for (const oaEv of oddsApiEvents ?? []) {
-              await supabase.from('events').update({ completed: true, scores: espnEv.scores }).eq('id', oaEv.id);
+              const oaHomeLast = oaEv.home_team.split(' ').pop()?.toLowerCase() ?? '';
+              const oaAwayLast = oaEv.away_team.split(' ').pop()?.toLowerCase() ?? '';
+
+              if (espnHomeLast === oaHomeLast && espnAwayLast === oaAwayLast) {
+                await supabase.from('events').update({ completed: true, scores: espnEv.scores }).eq('id', oaEv.id);
+                crossCount++;
+              }
             }
           }
-          ss.crossUpdated = completedEspn.length;
+          ss.crossUpdated = crossCount;
         }
       } catch (e) { ss.error = String(e); }
 
