@@ -94,7 +94,7 @@ function RecCard({ rec }: { rec: Record<string, unknown> }) {
 function SimRow({ bet }: { bet: Record<string, unknown> }) {
   const result = bet.result as string;
   const profit = bet.profit as number | null;
-  const ev = bet.events as { home_team: string; away_team: string } | null;
+  const ev = bet.events as { home_team: string; away_team: string; commence_time?: string } | null;
 
   const rColor = result === "won" ? "text-green-600" : result === "lost" ? "text-red-500" : "text-blue-500";
   const rBg = result === "won" ? "bg-green-50" : result === "lost" ? "bg-red-50" : "bg-blue-50";
@@ -108,6 +108,12 @@ function SimRow({ bet }: { bet: Record<string, unknown> }) {
           {result === "won" && <span className="text-[9px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">GANADA</span>}
           {result === "lost" && <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">PERDIDA</span>}
           {result === "pending" && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">PENDIENTE</span>}
+          {ev?.commence_time && (
+            <span className="text-[9px] text-gray-400">
+              {new Date(ev.commence_time).toLocaleDateString("es-PR", { month: "short", day: "numeric" })}{" "}
+              {new Date(ev.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" })}
+            </span>
+          )}
         </div>
         <p className="text-[11px] text-gray-400 truncate">{ev ? `${ev.away_team} @ ${ev.home_team}` : ""}</p>
         <p className="text-[12px] font-semibold text-gray-800 truncate">{bet.outcome_name as string}</p>
@@ -151,7 +157,7 @@ export default function Dashboard() {
 
   const { data: simBets } = useSWR("sim-home", async () => {
     const s = getClient();
-    const { data } = await s.from("simulated_bets").select("*, events(home_team, away_team, scores)").order("placed_at", { ascending: false }).limit(5);
+    const { data } = await s.from("simulated_bets").select("*, events(home_team, away_team, commence_time, scores)").order("placed_at", { ascending: false }).limit(5);
     return data ?? [];
   });
 

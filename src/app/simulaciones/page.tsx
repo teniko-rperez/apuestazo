@@ -25,6 +25,7 @@ interface SimBet {
     home_team: string;
     away_team: string;
     sport_key: string;
+    commence_time: string;
     scores: { home: number; away: number } | null;
   };
 }
@@ -34,7 +35,7 @@ function useSimBets() {
     const s = getClient();
     const { data, error } = await s
       .from("simulated_bets")
-      .select("*, events(home_team, away_team, sport_key, scores)")
+      .select("*, events(home_team, away_team, sport_key, commence_time, scores)")
       .order("placed_at", { ascending: false })
       .limit(100);
     if (error) throw error;
@@ -70,19 +71,17 @@ function BetRow({ bet }: { bet: SimBet }) {
           {bet.result === "lost" && <Badge className="bg-red-100 text-red-600 text-[9px] h-4 px-1.5 font-bold">PERDIDA</Badge>}
           {bet.result === "push" && <Badge className="bg-yellow-100 text-yellow-700 text-[9px] h-4 px-1.5 font-bold">EMPATE</Badge>}
           {bet.result === "pending" && <Badge className="bg-blue-50 text-blue-600 text-[9px] h-4 px-1.5">PENDIENTE</Badge>}
+          {bet.events?.commence_time && (
+            <span className="text-[9px] text-gray-400">
+              {new Date(bet.events.commence_time).toLocaleDateString("es-PR", { month: "short", day: "numeric" })}{" "}
+              {new Date(bet.events.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" })}
+            </span>
+          )}
         </div>
         <p className="text-[11px] text-gray-400 truncate">
           {bet.events ? `${bet.events.away_team} @ ${bet.events.home_team}` : ""}
         </p>
         <p className="text-[12px] font-semibold text-gray-800 truncate">{bet.outcome_name}</p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <Badge className="bg-gray-100 text-gray-500 text-[9px] h-4 px-1.5">
-            {MARKET_LABELS[bet.market_key] ?? bet.market_key}
-          </Badge>
-          <span className="text-[9px] text-gray-400">
-            {BOOKMAKERS[bet.bookmaker_key]?.name ?? bet.bookmaker_key}
-          </span>
-        </div>
       </div>
       <div className="text-right shrink-0">
         <p className="text-[13px] font-bold font-mono text-orange-500">{formatOdds(bet.odds)}</p>
