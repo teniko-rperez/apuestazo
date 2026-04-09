@@ -99,19 +99,21 @@ function SimRow({ bet }: { bet: Record<string, unknown> }) {
   const rColor = result === "won" ? "text-green-600" : result === "lost" ? "text-red-500" : "text-blue-500";
   const rBg = result === "won" ? "bg-green-50" : result === "lost" ? "bg-red-50" : "bg-blue-50";
 
+  const borderColor = result === "won" ? "border-l-green-500" : result === "lost" ? "border-l-red-500" : "border-l-blue-400";
+
   return (
-    <div className="bg-white rounded-2xl p-3 shadow-sm border border-border/50 flex items-center gap-3">
-      <div className={`w-8 h-8 rounded-full ${rBg} flex items-center justify-center shrink-0`}>
-        <span className={`text-[11px] font-black ${rColor}`}>
-          {result === "won" ? "W" : result === "lost" ? "L" : "..."}
-        </span>
-      </div>
+    <div className={`bg-white rounded-2xl p-3 shadow-sm border border-border/50 border-l-4 ${borderColor} flex items-center gap-3`}>
       <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          {result === "won" && <span className="text-[9px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">GANADA</span>}
+          {result === "lost" && <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">PERDIDA</span>}
+          {result === "pending" && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">PENDIENTE</span>}
+        </div>
         <p className="text-[11px] text-gray-400 truncate">{ev ? `${ev.away_team} @ ${ev.home_team}` : ""}</p>
         <p className="text-[12px] font-semibold text-gray-800 truncate">{bet.outcome_name as string}</p>
       </div>
       <div className="text-right shrink-0">
-        <p className="text-[12px] font-bold font-mono text-gray-600">{formatOdds(bet.odds as number)}</p>
+        <p className="text-[12px] font-bold font-mono text-orange-500">{formatOdds(bet.odds as number)}</p>
         {profit != null && (
           <p className={`text-[12px] font-bold font-mono ${profit >= 0 ? "text-green-600" : "text-red-500"}`}>
             {profit >= 0 ? "+" : ""}${profit.toFixed(0)}

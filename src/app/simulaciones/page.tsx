@@ -55,14 +55,22 @@ function BetRow({ bet }: { bet: SimBet }) {
   const rColor = bet.result === "won" ? "text-green-600" : bet.result === "lost" ? "text-red-500" : "text-blue-600";
   const rBg = bet.result === "won" ? "bg-green-50" : bet.result === "lost" ? "bg-red-50" : "bg-blue-50";
 
+  const borderColor = bet.result === "won" ? "border-l-green-500" : bet.result === "lost" ? "border-l-red-500" : "border-l-blue-400";
+
   return (
-    <div className="bg-white rounded-2xl p-3 shadow-sm border border-border/50 flex items-center gap-3">
+    <div className={`bg-white rounded-2xl p-3 shadow-sm border border-border/50 border-l-4 ${borderColor} flex items-center gap-3`}>
       <div className={`w-9 h-9 rounded-full ${rBg} flex items-center justify-center shrink-0`}>
         <span className={`text-[11px] font-black ${rColor}`}>
           {bet.result === "won" ? "W" : bet.result === "lost" ? "L" : bet.result === "push" ? "P" : "..."}
         </span>
       </div>
       <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          {bet.result === "won" && <Badge className="bg-green-100 text-green-700 text-[9px] h-4 px-1.5 font-bold">GANADA</Badge>}
+          {bet.result === "lost" && <Badge className="bg-red-100 text-red-600 text-[9px] h-4 px-1.5 font-bold">PERDIDA</Badge>}
+          {bet.result === "push" && <Badge className="bg-yellow-100 text-yellow-700 text-[9px] h-4 px-1.5 font-bold">EMPATE</Badge>}
+          {bet.result === "pending" && <Badge className="bg-blue-50 text-blue-600 text-[9px] h-4 px-1.5">PENDIENTE</Badge>}
+        </div>
         <p className="text-[11px] text-gray-400 truncate">
           {bet.events ? `${bet.events.away_team} @ ${bet.events.home_team}` : ""}
         </p>
