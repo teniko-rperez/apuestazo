@@ -20,6 +20,7 @@ import type { LineMovement, SteamMove } from './line-movement';
 import type { ParlayCombo } from './parlay-builder';
 import type { ExpertPick } from '@/lib/scrapers/experts';
 import type { KalshiContract } from '@/lib/scrapers/kalshi';
+import type { NbaTeamStats, MlbTeamStats } from '@/lib/scrapers/stats';
 
 export interface EngineInput {
   arbs: ArbResult[];
@@ -48,6 +49,7 @@ export interface EngineInput {
   }>;
   parlays: ParlayCombo[];
   kalshiContracts: KalshiContract[];
+  teamStats: Map<string, { win_pct: number; avg_points?: number; recent_form?: string }>;
   eventTeams: Map<string, { home_team: string; away_team: string }>;
 }
 
@@ -311,6 +313,35 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
         addSignal(eventId, 'totals', 'Over', 'draftkings', 0,
           'ROBINHOOD', score,
           `Robinhood/Kalshi: Over ${overMatch[1]} a ${contract.yes_price}¢ (${(impliedProb * 100).toFixed(0)}%)`
+        );
+      }
+    }
+  }
+
+  // ─── Signal 9: Team Stats (win%, form, log5 probability) ───
+  for (const [eventId, teams] of input.eventTeams) {
+    const homeStats = input.teamStats.get(teams.home_team);
+    const awayStats = input.teamStats.get(teams.away_team);
+
+    if (homeStats && awayStats) {
+      // Use log5 to estimate who should win
+      const homeProb = (homeStats.win_pct - homeStats.win_pct * awayStats.win_pct) /
+        (homeStats.win_pct + awayStats.win_pct - 2 * homeStats.win_pct * awayStats.win_pct);
+
+      if (homeProb > 0.60) {
+        const score = homeProb > 0.70 ? 0.20 : 0.14;
+        const form = homeStats.recent_form ? ` (racha: ${homeStats.recent_form})` : '';
+        addSignal(eventId, 'h2h', teams.home_team, 'draftkings', 0,
+          'STATS', score,
+          `Stats: ${teams.home_team} ${(homeProb * 100).toFixed(0)}% prob por win% (${(homeStats.win_pct * 100).toFixed(0)}% vs ${(awayStats.win_pct * 100).toFixed(0)}%)${form}`
+        );
+      } else if (homeProb < 0.40) {
+        const awayProb = 1 - homeProb;
+        const score = awayProb > 0.70 ? 0.20 : 0.14;
+        const form = awayStats.recent_form ? ` (racha: ${awayStats.recent_form})` : '';
+        addSignal(eventId, 'h2h', teams.away_team, 'draftkings', 0,
+          'STATS', score,
+          `Stats: ${teams.away_team} ${(awayProb * 100).toFixed(0)}% prob por win% (${(awayStats.win_pct * 100).toFixed(0)}% vs ${(homeStats.win_pct * 100).toFixed(0)}%)${form}`
         );
       }
     }

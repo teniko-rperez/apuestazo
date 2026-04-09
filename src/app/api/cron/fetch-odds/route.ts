@@ -10,6 +10,7 @@ import { detectLineMovements, detectSteamMoves } from '@/lib/analysis/line-movem
 import { generateRecommendations, type EngineInput } from '@/lib/analysis/recommendation-engine';
 import type { LatestOdds, OddsSnapshot } from '@/types/odds';
 import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
+import { fetchNbaTeamStats, fetchMlbTeamStats } from '@/lib/scrapers/stats';
 import { fetchOdds as fetchTheOddsApi } from '@/lib/odds-api/client';
 import { logApiUsage, getRemainingCredits, canAffordRequest } from '@/lib/odds-api/budget-tracker';
 import type { ExpertPick } from '@/lib/scrapers/experts';
@@ -157,8 +158,23 @@ export async function GET(request: Request) {
       const { data: kalshiData } = await supabase.from('robinhood_contracts').select('*').gte('scraped_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString());
       const kalshiContracts = (kalshiData ?? []) as unknown as import('@/lib/scrapers/kalshi').KalshiContract[];
 
-      // ═══ PHASE 3: CORRELATION ENGINE ═══
-      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, eventTeams } as EngineInput);
+      // Fetch team stats for upcoming games
+      const teamStats = new Map<string, { win_pct: number; avg_points?: number; recent_form?: string }>();
+      for (const [, teams] of eventTeams) {
+        for (const teamName of [teams.home_team, teams.away_team]) {
+          if (teamStats.has(teamName)) continue;
+          try {
+            const nba = await fetchNbaTeamStats(teamName);
+            if (nba) { teamStats.set(teamName, { win_pct: nba.win_pct, avg_points: nba.avg_points, recent_form: nba.recent_form }); continue; }
+            const mlb = await fetchMlbTeamStats(teamName);
+            if (mlb) { teamStats.set(teamName, { win_pct: mlb.win_pct }); }
+          } catch { /* ok */ }
+        }
+      }
+      summary.teamStats = teamStats.size;
+
+      // ═══ PHASE 3: CORRELATION ENGINE (9 signals) ═══
+      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, eventTeams } as EngineInput);
       summary.engineSignals = { arbs: arbs.length, evs: evs.length, experts: typedExperts.length, lineMovements: lineMovements.length, steamMoves: steamMoves.length, consensus: allConsensus.length, discrepancies: discrepancies.length, parlays: parlays.length, robinhood: kalshiContracts.length };
 
       if (engineRecs.length > 0) {
