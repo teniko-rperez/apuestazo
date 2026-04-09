@@ -100,9 +100,9 @@ export async function fetchEspnScoreboard(sportKey: string): Promise<{
   const allOdds: ScrapedOdds[] = [];
   const seenEventIds = new Set<string>();
 
-  // Fetch today and tomorrow (covers timezone differences)
+  // Fetch yesterday + today + tomorrow (yesterday for settling scores, tomorrow for PR timezone)
   const dates: string[] = [];
-  for (let i = 0; i <= 1; i++) {
+  for (let i = -1; i <= 1; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     dates.push(d.toISOString().slice(0, 10).replace(/-/g, ''));
