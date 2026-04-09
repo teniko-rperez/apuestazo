@@ -97,12 +97,12 @@ export async function GET(request: Request) {
           const { data: kalshi } = await supabase.from('robinhood_contracts').select('*').eq('sport', sport).gte('scraped_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()).limit(10);
           if (kalshi && kalshi.length > 0) {
             const now = new Date().toISOString();
-            const kalshiPicks = kalshi.filter((c: Record<string, unknown>) => (c.yes_price as number) > 50).map((c: Record<string, unknown>) => ({
-              expert_name: 'Kalshi Market', source: 'Robinhood/Kalshi', source_url: 'https://kalshi.com',
-              sport, pick_type: 'moneyline',
-              pick_description: `${(c.title as string).slice(0, 150)} - ${c.yes_price}¢ (${c.yes_price}% prob)`,
-              confidence: (c.yes_price as number) > 70 ? 'alta' : (c.yes_price as number) > 55 ? 'media' : 'baja' as const,
-              record: `vol: ${c.volume}`, profit_units: null, scraped_at: now,
+            const kalshiPicks = kalshi.map((c: Record<string, unknown>) => ({
+              expert_name: 'Kalshi/Robinhood', source: 'Robinhood/Kalshi', source_url: 'https://kalshi.com',
+              sport, pick_type: 'parlay',
+              pick_description: ((c.title as string) ?? '').slice(0, 200),
+              confidence: 'media' as const,
+              record: `Contrato Kalshi`, profit_units: null, scraped_at: now,
             }));
             if (kalshiPicks.length > 0) {
               await supabase.from('expert_picks').insert(kalshiPicks);
