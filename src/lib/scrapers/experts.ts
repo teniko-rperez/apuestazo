@@ -1,6 +1,6 @@
 /**
- * Expert picks scraper - monitors betting experts and tipsters.
- * Scrapes from Covers.com leaderboard and public pick sites.
+ * Expert picks scraper.
+ * Sources: Reddit (multiple subs), Covers.com, Social media.
  */
 
 export interface ExpertPick {
@@ -8,154 +8,147 @@ export interface ExpertPick {
   source: string;
   source_url: string;
   sport: string;
-  pick_type: string; // 'moneyline' | 'spread' | 'total' | 'prop'
+  pick_type: string;
   pick_description: string;
   confidence: 'alta' | 'media' | 'baja';
-  record: string; // e.g., "145-120 (54.7%)"
+  record: string;
   profit_units: number | null;
   scraped_at: string;
 }
 
 /**
- * Fetch expert leaderboard from Covers.com
+ * Fetch Reddit picks from multiple sports betting subreddits.
  */
-export async function fetchCoversExperts(sport: 'nba' | 'mlb'): Promise<ExpertPick[]> {
-  const sportPath = sport === 'nba' ? 'basketball' : 'baseball';
-  const url = `https://www.covers.com/picks/${sportPath}`;
+async function fetchRedditPicks(sport: 'nba' | 'mlb'): Promise<ExpertPick[]> {
+  const subs = ['sportsbook', 'sportsbetting'];
+  if (sport === 'nba') subs.push('NBAbetting');
+  if (sport === 'mlb') subs.push('MLBbetting');
 
-  try {
-    const res = await fetch(url, {
-      cache: 'no-store',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Accept: 'text/html',
-      },
-    });
-
-    if (!res.ok) return [];
-
-    const html = await res.text();
-    return parseCoversHtml(html, sport);
-  } catch {
-    return [];
-  }
-}
-
-function parseCoversHtml(html: string, sport: string): ExpertPick[] {
-  const picks: ExpertPick[] = [];
+  const allPicks: ExpertPick[] = [];
   const now = new Date().toISOString();
 
-  // Parse expert pick cards from Covers HTML
-  // Look for patterns like expert name, record, and pick info
-  const expertPattern =
-    /<div[^>]*class="[^"]*expert[^"]*"[^>]*>[\s\S]*?<\/div>/gi;
-  const matches = html.match(expertPattern) ?? [];
-
-  for (const match of matches) {
-    // Extract expert name
-    const nameMatch = match.match(
-      /class="[^"]*name[^"]*"[^>]*>([^<]+)</i
-    );
-    // Extract record
-    const recordMatch = match.match(
-      /(\d+)-(\d+)\s*\(?([\d.]+%?)\)?/
-    );
-    // Extract pick description
-    const pickMatch = match.match(
-      /class="[^"]*pick[^"]*"[^>]*>([^<]+)</i
-    );
-
-    if (nameMatch) {
-      const wins = recordMatch ? parseInt(recordMatch[1]) : 0;
-      const losses = recordMatch ? parseInt(recordMatch[2]) : 0;
-      const winPct = wins + losses > 0 ? wins / (wins + losses) : 0;
-
-      picks.push({
-        expert_name: nameMatch[1].trim(),
-        source: 'Covers.com',
-        source_url: `https://www.covers.com/picks/${sport === 'nba' ? 'basketball' : 'baseball'}`,
-        sport,
-        pick_type: 'spread',
-        pick_description: pickMatch ? pickMatch[1].trim() : 'Consultar sitio',
-        confidence: winPct > 0.57 ? 'alta' : winPct > 0.53 ? 'media' : 'baja',
-        record: recordMatch
-          ? `${recordMatch[1]}-${recordMatch[2]} (${recordMatch[3]})`
-          : 'N/A',
-        profit_units: null,
-        scraped_at: now,
+  for (const sub of subs) {
+    try {
+      // Get hot posts (more likely to have picks)
+      const url = `https://old.reddit.com/r/${sub}/hot.json?limit=15`;
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Apuestazo/1.0)' },
+        signal: AbortSignal.timeout(5000),
       });
-    }
-  }
+      if (!res.ok) continue;
 
-  return picks;
-}
-
-/**
- * Fetch Reddit r/sportsbook consensus picks via old.reddit.com JSON API.
- * Reddit exposes .json on any page without auth.
- */
-export async function fetchRedditPicks(sport: 'nba' | 'mlb'): Promise<ExpertPick[]> {
-  const query = sport === 'nba' ? 'NBA daily' : 'MLB daily';
-  const url = `https://old.reddit.com/r/sportsbook/search.json?q=${encodeURIComponent(query)}&sort=new&restrict_sr=on&limit=5`;
-
-  try {
-    const res = await fetch(url, {
-      cache: 'no-store',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Apuestazo/1.0)',
-      },
-    });
-
-    if (!res.ok) return [];
-
-    const data = (await res.json()) as {
-      data: {
-        children: Array<{
-          data: {
-            title: string;
-            selftext: string;
-            url: string;
-            score: number;
-            created_utc: number;
-          };
-        }>;
+      const data = await res.json() as {
+        data: { children: Array<{ data: { title: string; selftext: string; url: string; score: number; num_comments: number; subreddit: string } }> };
       };
-    };
 
-    const picks: ExpertPick[] = [];
-    const now = new Date().toISOString();
+      for (const post of data.data.children ?? []) {
+        const { title, selftext, url: postUrl, score, num_comments, subreddit } = post.data;
+        if (score < 3) continue;
 
-    for (const post of data.data.children ?? []) {
-      const { title, selftext, url: postUrl, score } = post.data;
+        const titleLower = title.toLowerCase();
+        const sportMatch = sport === 'nba'
+          ? /nba|basketball|props|daily|picks|celtics|lakers|warriors|bucks|nuggets|suns|cavaliers|thunder/i
+          : /mlb|baseball|props|daily|picks|yankees|dodgers|braves|astros|mets|phillies/i;
 
-      // Extract picks that mention specific teams/lines from highly upvoted comments
-      if (score > 5 && (title.toLowerCase().includes(sport) || title.toLowerCase().includes('daily'))) {
-        // Look for betting lines in the post text (e.g., "Lakers -3.5", "Over 220.5")
-        const linePattern =
-          /([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s*([+-]?\d+\.?\d*)/g;
-        let lineMatch;
+        if (!sportMatch.test(title)) continue;
 
-        while ((lineMatch = linePattern.exec(selftext)) !== null) {
-          picks.push({
-            expert_name: `r/sportsbook (${score} upvotes)`,
-            source: 'Reddit r/sportsbook',
-            source_url: postUrl,
+        // Always save the post title as a pick (it's the main signal)
+        allPicks.push({
+          expert_name: `r/${subreddit}`,
+          source: `Reddit r/${subreddit}`,
+          source_url: postUrl.startsWith('http') ? postUrl : `https://old.reddit.com${postUrl}`,
+          sport,
+          pick_type: titleLower.includes('prop') ? 'prop' : 'spread',
+          pick_description: title.slice(0, 200),
+          confidence: score > 50 ? 'alta' : score > 15 ? 'media' : 'baja',
+          record: `${score} upvotes, ${num_comments} comments`,
+          profit_units: null,
+          scraped_at: now,
+        });
+
+        // Also extract any team/line mentions from selftext
+        const text = selftext.slice(0, 1000);
+        const teams = text.match(/(?:celtics|lakers|warriors|bucks|nuggets|suns|cavaliers|thunder|mavericks|rockets|nets|heat|hawks|76ers|knicks|clippers|yankees|dodgers|braves|astros|mets|phillies|padres|cubs|cardinals|guardians|orioles|rays|mariners|rangers|twins|tigers|reds|giants|diamondbacks|brewers|royals|pirates|rockies|angels|marlins|nationals|white sox|red sox)\s*[+-]?\d*\.?\d*/gi) ?? [];
+
+        for (const match of teams.slice(0, 3)) {
+          allPicks.push({
+            expert_name: `r/${subreddit} user`,
+            source: `Reddit r/${subreddit}`,
+            source_url: postUrl.startsWith('http') ? postUrl : `https://old.reddit.com${postUrl}`,
             sport,
             pick_type: 'spread',
-            pick_description: `${lineMatch[1]} ${lineMatch[2]}`,
-            confidence: score > 50 ? 'alta' : score > 20 ? 'media' : 'baja',
-            record: `${score} upvotes`,
+            pick_description: match.trim(),
+            confidence: score > 30 ? 'media' : 'baja',
+            record: `from post (${score} upvotes)`,
             profit_units: null,
             scraped_at: now,
           });
         }
       }
+    } catch {
+      continue;
     }
-
-    return picks.slice(0, 10);
-  } catch {
-    return [];
   }
+
+  return allPicks.slice(0, 20);
+}
+
+/**
+ * Fetch ESPN expert picks/predictions from their public API.
+ */
+async function fetchEspnPredictions(sport: 'nba' | 'mlb'): Promise<ExpertPick[]> {
+  const espnSport = sport === 'nba' ? 'basketball/nba' : 'baseball/mlb';
+  const picks: ExpertPick[] = [];
+  const now = new Date().toISOString();
+
+  try {
+    const res = await fetch(
+      `https://site.api.espn.com/apis/site/v2/sports/${espnSport}/scoreboard`,
+      { cache: 'no-store', signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) return [];
+
+    const data = await res.json();
+
+    for (const event of data.events ?? []) {
+      const comp = event.competitions?.[0];
+      if (!comp) continue;
+
+      // ESPN sometimes includes pickcenter predictions
+      const pickcenter = comp.pickcenter;
+      if (pickcenter && Array.isArray(pickcenter)) {
+        for (const pick of pickcenter) {
+          const provider = pick.provider?.name ?? 'ESPN';
+          const homeTeam = comp.competitors?.find((c: { homeAway: string }) => c.homeAway === 'home')?.team?.displayName ?? '';
+          const awayTeam = comp.competitors?.find((c: { homeAway: string }) => c.homeAway === 'away')?.team?.displayName ?? '';
+
+          if (pick.homeTeamOdds?.value != null) {
+            const homePct = pick.homeTeamOdds.value;
+            const favored = homePct > 50 ? homeTeam : awayTeam;
+            const pct = homePct > 50 ? homePct : 100 - homePct;
+
+            picks.push({
+              expert_name: provider,
+              source: 'ESPN Predicciones',
+              source_url: `https://www.espn.com/${sport}`,
+              sport,
+              pick_type: 'moneyline',
+              pick_description: `${favored} ${pct.toFixed(0)}% favorito (${awayTeam} @ ${homeTeam})`,
+              confidence: pct > 65 ? 'alta' : pct > 55 ? 'media' : 'baja',
+              record: `ESPN ${provider}`,
+              profit_units: null,
+              scraped_at: now,
+            });
+          }
+        }
+      }
+    }
+  } catch {
+    // ok
+  }
+
+  return picks;
 }
 
 /**
@@ -164,14 +157,16 @@ export async function fetchRedditPicks(sport: 'nba' | 'mlb'): Promise<ExpertPick
 export async function fetchAllExpertPicks(
   sport: 'nba' | 'mlb'
 ): Promise<ExpertPick[]> {
-  // Dynamic import to avoid circular deps
-  const { fetchSocialPicks } = await import('./social');
+  let socialPicks: ExpertPick[] = [];
+  try {
+    const { fetchSocialPicks } = await import('./social');
+    socialPicks = await fetchSocialPicks(sport);
+  } catch { /* ok */ }
 
-  const [covers, reddit, social] = await Promise.all([
-    fetchCoversExperts(sport).catch(() => []),
+  const [reddit, espn] = await Promise.all([
     fetchRedditPicks(sport).catch(() => []),
-    fetchSocialPicks(sport).catch(() => []),
+    fetchEspnPredictions(sport).catch(() => []),
   ]);
 
-  return [...covers, ...reddit, ...social];
+  return [...reddit, ...espn, ...socialPicks];
 }
