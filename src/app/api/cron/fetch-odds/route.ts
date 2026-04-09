@@ -10,6 +10,8 @@ import { detectLineMovements, detectSteamMoves } from '@/lib/analysis/line-movem
 import { generateRecommendations, type EngineInput } from '@/lib/analysis/recommendation-engine';
 import type { LatestOdds, OddsSnapshot } from '@/types/odds';
 import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
+import { fetchOdds as fetchTheOddsApi } from '@/lib/odds-api/client';
+import { logApiUsage, getRemainingCredits, canAffordRequest } from '@/lib/odds-api/budget-tracker';
 import type { ExpertPick } from '@/lib/scrapers/experts';
 
 const SPORT_KEYS = ['basketball_nba', 'baseball_mlb'];
@@ -41,6 +43,35 @@ export async function GET(request: Request) {
           await supabase.from('odds_snapshots').insert(odds.map((o) => ({ event_id: o.event_id, bookmaker_key: o.bookmaker_key, market_key: o.market_key, outcomes: o.outcomes, fetched_at: t })));
         }
       } catch (e) { ss.error = String(e); }
+
+      // 1b. The Odds API (6 bookmakers, 500 req/month free)
+      if (process.env.ODDS_API_KEY) {
+        try {
+          const remaining = await getRemainingCredits(supabase);
+          if (canAffordRequest(remaining, 3)) {
+            const { events: oddsEvents, creditsUsed } = await fetchTheOddsApi(sportKey);
+            await logApiUsage(supabase, `/sports/${sportKey}/odds`, creditsUsed, sportKey, ['h2h', 'spreads', 'totals']);
+            const t = new Date().toISOString();
+            const snaps: Array<{ event_id: string; bookmaker_key: string; market_key: string; outcomes: unknown; fetched_at: string }> = [];
+            for (const ev of oddsEvents) {
+              // Upsert event from Odds API
+              await supabase.from('events').upsert({ id: ev.id, sport_key: ev.sport_key, commence_time: ev.commence_time, home_team: ev.home_team, away_team: ev.away_team }, { onConflict: 'id' });
+              for (const bk of ev.bookmakers) {
+                for (const mk of bk.markets) {
+                  snaps.push({ event_id: ev.id, bookmaker_key: bk.key, market_key: mk.key, outcomes: mk.outcomes, fetched_at: t });
+                }
+              }
+            }
+            if (snaps.length > 0) await supabase.from('odds_snapshots').insert(snaps);
+            ss.oddsApiEvents = oddsEvents.length;
+            ss.oddsApiSnapshots = snaps.length;
+            ss.oddsApiCredits = creditsUsed;
+            ss.oddsApiRemaining = remaining - creditsUsed;
+          } else {
+            ss.oddsApiSkipped = `${remaining} credits remaining`;
+          }
+        } catch (e) { ss.oddsApiError = String(e); }
+      }
 
       const sport = sportKey === 'basketball_nba' ? 'nba' : 'mlb';
       try {
