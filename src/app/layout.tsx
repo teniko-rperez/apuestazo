@@ -23,7 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#f0f2f8",
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({
@@ -36,12 +36,12 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full bg-[#f8fafc]">
         <Navbar />
-        {/* Mobile: full width with bottom padding for nav */}
-        {/* Desktop: offset left for sidebar, centered content */}
-        <main className="flex-1 px-3 pt-3 pb-safe w-full max-w-md mx-auto lg:max-w-6xl lg:ml-[230px] lg:mr-auto lg:px-8 lg:pt-5">
-          {children}
+        <main className="pb-safe lg:pl-[260px] min-h-screen">
+          <div className="px-4 pt-16 pb-6 lg:pt-6 lg:px-8 max-w-[1400px] mx-auto">
+            {children}
+          </div>
         </main>
       </body>
     </html>
