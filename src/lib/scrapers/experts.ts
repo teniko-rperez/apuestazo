@@ -29,8 +29,8 @@ async function fetchRedditPicks(sport: 'nba' | 'mlb'): Promise<ExpertPick[]> {
 
   for (const sub of subs) {
     try {
-      // Get hot posts (more likely to have picks)
-      const url = `https://old.reddit.com/r/${sub}/hot.json?limit=15`;
+      // Get hot posts + search for sport-specific
+      const url = `https://old.reddit.com/r/${sub}/hot.json?limit=25`;
       const res = await fetch(url, {
         cache: 'no-store',
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Apuestazo/1.0)' },
@@ -46,12 +46,13 @@ async function fetchRedditPicks(sport: 'nba' | 'mlb'): Promise<ExpertPick[]> {
         const { title, selftext, url: postUrl, score, num_comments, subreddit } = post.data;
         if (score < 3) continue;
 
-        const titleLower = title.toLowerCase();
+        const fullText = `${title} ${selftext.slice(0, 500)}`.toLowerCase();
         const sportMatch = sport === 'nba'
-          ? /nba|basketball|props|daily|picks|celtics|lakers|warriors|bucks|nuggets|suns|cavaliers|thunder/i
-          : /mlb|baseball|props|daily|picks|yankees|dodgers|braves|astros|mets|phillies/i;
+          ? /nba|basketball|celtics|lakers|warriors|bucks|nuggets|suns|cavaliers|thunder|mavericks|rockets|clippers|heat|hawks|76ers|knicks|pacers|magic|grizzlies|pelicans|spurs|pistons|nets|raptors|bulls|hornets|jazz|blazers|kings|wizards/i
+          : /mlb|baseball|yankees|dodgers|braves|astros|mets|phillies|padres|cubs|cardinals|guardians|orioles|rays|mariners|rangers|twins|tigers|reds|giants|diamondbacks|brewers|royals|pirates|rockies|angels|marlins|nationals|white sox|red sox/i;
 
-        if (!sportMatch.test(title)) continue;
+        // Match in title OR selftext
+        if (!sportMatch.test(fullText)) continue;
 
         // Always save the post title as a pick (it's the main signal)
         allPicks.push({
@@ -59,7 +60,7 @@ async function fetchRedditPicks(sport: 'nba' | 'mlb'): Promise<ExpertPick[]> {
           source: `Reddit r/${subreddit}`,
           source_url: postUrl.startsWith('http') ? postUrl : `https://old.reddit.com${postUrl}`,
           sport,
-          pick_type: titleLower.includes('prop') ? 'prop' : 'spread',
+          pick_type: title.toLowerCase().includes('prop') ? 'prop' : 'spread',
           pick_description: title.slice(0, 200),
           confidence: score > 50 ? 'alta' : score > 15 ? 'media' : 'baja',
           record: `${score} upvotes, ${num_comments} comments`,
