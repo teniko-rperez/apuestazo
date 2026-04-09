@@ -5,87 +5,43 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecommendations } from "@/hooks/use-recommendations";
 import { useArbitrageOpportunities, useEvOpportunities } from "@/hooks/use-arbitrage";
-import { useEvents, useSportOdds } from "@/hooks/use-odds";
-import { BOOKMAKERS } from "@/lib/constants";
 import { formatOdds, explainOdds } from "@/lib/analysis/implied-probability";
-import type { GameEvent } from "@/types/event";
-import type { LatestOdds, Outcome } from "@/types/odds";
 import useSWR from "swr";
 import { getClient } from "@/lib/supabase/client";
 
-/* ─── Game Row ─── */
-function GameRow({ event, odds }: { event: GameEvent; odds: LatestOdds[] }) {
-  const h2h = odds.filter((o) => o.event_id === event.id && o.market_key === "h2h");
-
-  function best(team: string) {
-    let b: { price: number; book: string } | null = null;
-    for (const r of h2h) {
-      const o = (r.outcomes as Outcome[]).find((x) => x.name === team);
-      if (o && (!b || o.price > b.price)) b = { price: o.price, book: r.bookmaker_key };
-    }
-    return b;
-  }
-
-  const ho = best(event.home_team);
-  const ao = best(event.away_team);
-  const time = new Date(event.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" });
-  const path = event.sport_key === "basketball_nba" ? "nba" : "mlb";
-
-  return (
-    <Link href={`/${path}/${event.id}`}>
-      <div className="bg-white rounded-2xl p-3 shadow-sm border border-border/50 active:scale-[0.98] transition-transform">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-            {event.sport_key === "basketball_nba" ? "NBA" : "MLB"}
-          </span>
-          {event.completed ? (
-            <Badge className="bg-gray-100 text-gray-500 text-[10px] h-5 px-1.5 font-semibold">FINAL</Badge>
-          ) : (
-            <span className="text-[10px] text-gray-400 font-medium">{time}</span>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] font-medium text-gray-800 truncate flex-1">{event.away_team}</span>
-            {event.scores && <span className="text-[13px] font-bold text-gray-800 mx-2">{event.scores.away}</span>}
-            {ao && <span className="text-[13px] font-bold text-orange-500 font-mono ml-1">{formatOdds(ao.price)}</span>}
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1 flex-1">
-              <span className="text-[13px] font-medium text-gray-800 truncate">{event.home_team}</span>
-              <span className="text-[8px] text-blue-500 font-bold">HOME</span>
-            </div>
-            {event.scores && <span className="text-[13px] font-bold text-gray-800 mx-2">{event.scores.home}</span>}
-            {ho && <span className="text-[13px] font-bold text-orange-500 font-mono ml-1">{formatOdds(ho.price)}</span>}
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 /* ─── Rec Card ─── */
 function RecCard({ rec }: { rec: Record<string, unknown> }) {
-  const ev = rec.events as { home_team: string; away_team: string } | null;
+  const ev = rec.events as { home_team: string; away_team: string; sport_key?: string; commence_time?: string } | null;
   const conf = rec.confidence_score as number;
-  const type = rec.type as string;
-
-  const typeLabel = type === "arbitrage" ? "ARB" : type === "ev" ? "+EV" : "VALUE";
-  const typeBg = type === "arbitrage" ? "bg-yellow-100 text-yellow-700" : type === "ev" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-600";
+  const odds = rec.odds as number;
+  const reasoning = rec.reasoning as string;
+  const isSafe = reasoning?.includes('MAS SEGURA');
+  const isSecure = reasoning?.includes('SEGURA') && !isSafe;
+  const sport = ev?.sport_key === "basketball_nba" ? "NBA" : ev?.sport_key === "baseball_mlb" ? "MLB" : "";
+  const time = ev?.commence_time
+    ? `${new Date(ev.commence_time).toLocaleDateString("es-PR", { month: "short", day: "numeric" })} ${new Date(ev.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" })}`
+    : "";
 
   return (
     <div className="bg-white rounded-2xl p-3 shadow-sm border border-border/50">
-      <div className="flex items-center justify-between mb-1.5">
-        <Badge className={`${typeBg} text-[10px] h-5 px-1.5 font-bold`}>{typeLabel}</Badge>
-        <span className="text-[11px] font-bold text-blue-600">{Math.round(conf * 100)}%</span>
+      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+        {sport && <Badge className="bg-gray-100 text-gray-600 text-[9px] h-4 px-1.5 font-bold">{sport}</Badge>}
+        {isSafe && <Badge className="bg-green-100 text-green-700 text-[8px] h-4 px-1 font-bold">MAS SEGURA</Badge>}
+        {isSecure && <Badge className="bg-blue-100 text-blue-700 text-[8px] h-4 px-1 font-bold">SEGURA</Badge>}
+        <span className="text-[10px] font-bold text-blue-600 ml-auto">{Math.round(conf * 100)}%</span>
       </div>
-      <p className="text-[11px] text-gray-400">{ev ? `${ev.away_team} @ ${ev.home_team}` : ""}</p>
+      <p className="text-[10px] text-gray-400">
+        {ev ? `${ev.away_team} vs ${ev.home_team}` : ""}
+        {ev && <span className="text-blue-500 font-bold ml-1">({ev.home_team} HOME)</span>}
+        {time && <span className="ml-1">&middot; {time}</span>}
+      </p>
       <div className="flex items-center justify-between mt-1">
         <span className="text-[13px] font-semibold text-gray-800">{rec.outcome_name as string}</span>
-        <span className="text-[14px] font-bold text-orange-500 font-mono">{formatOdds(rec.odds as number)}</span>
+        <div className="text-right">
+          <span className="text-[14px] font-bold text-orange-500 font-mono">{formatOdds(odds)}</span>
+          {odds !== 0 && <p className="text-[8px] text-gray-400">{explainOdds(odds, 50)}</p>}
+        </div>
       </div>
-      <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed line-clamp-2">{rec.reasoning as string}</p>
     </div>
   );
 }
@@ -95,10 +51,6 @@ function SimRow({ bet }: { bet: Record<string, unknown> }) {
   const result = bet.result as string;
   const profit = bet.profit as number | null;
   const ev = bet.events as { home_team: string; away_team: string; commence_time?: string } | null;
-
-  const rColor = result === "won" ? "text-green-600" : result === "lost" ? "text-red-500" : "text-blue-500";
-  const rBg = result === "won" ? "bg-green-50" : result === "lost" ? "bg-red-50" : "bg-blue-50";
-
   const borderColor = result === "won" ? "border-l-green-500" : result === "lost" ? "border-l-red-500" : "border-l-blue-400";
 
   return (
@@ -120,9 +72,6 @@ function SimRow({ bet }: { bet: Record<string, unknown> }) {
       </div>
       <div className="text-right shrink-0">
         <p className="text-[12px] font-bold font-mono text-orange-500">{formatOdds(bet.odds as number)}</p>
-        {(bet.odds as number) !== 0 && (
-          <p className="text-[8px] text-gray-400">{explainOdds(bet.odds as number, 50)}</p>
-        )}
         {profit != null && (
           <p className={`text-[12px] font-bold font-mono ${profit >= 0 ? "text-green-600" : "text-red-500"}`}>
             {profit >= 0 ? "+" : ""}${profit.toFixed(0)}
@@ -150,34 +99,29 @@ function Section({ title, count, href, children }: { title: string; count?: numb
 
 /* ─── Dashboard ─── */
 export default function Dashboard() {
-  const { data: nbaEvents, isLoading: l1 } = useEvents("basketball_nba");
-  const { data: mlbEvents, isLoading: l2 } = useEvents("baseball_mlb");
-  const { data: nbaOdds } = useSportOdds("basketball_nba");
-  const { data: mlbOdds } = useSportOdds("baseball_mlb");
-  const { data: recs } = useRecommendations(undefined, 5);
+  const { data: allRecs, isLoading: recsLoading } = useRecommendations(undefined, 30);
   const { data: arbs } = useArbitrageOpportunities();
   const { data: evs } = useEvOpportunities();
 
   const { data: simBets } = useSWR("sim-home", async () => {
     const s = getClient();
-    const { data } = await s.from("simulated_bets").select("*, events(home_team, away_team, commence_time, scores)").order("placed_at", { ascending: false }).limit(5);
+    const { data } = await s.from("simulated_bets").select("*, events(home_team, away_team, commence_time, scores)").order("placed_at", { ascending: false }).limit(10);
     return data ?? [];
   });
-
 
   const bets = (simBets ?? []) as Array<Record<string, unknown>>;
   const totalProfit = bets.reduce((s, b) => s + ((b.profit as number) ?? 0), 0);
   const wonCount = bets.filter((b) => b.result === "won").length;
   const settledCount = bets.filter((b) => b.result !== "pending").length;
 
-  const allEvents = [...(nbaEvents ?? []), ...(mlbEvents ?? [])].sort(
-    (a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime()
-  );
-  const allOdds = [...(nbaOdds ?? []), ...(mlbOdds ?? [])];
+  // Split recommendations by sport
+  const recs = (allRecs ?? []) as unknown as Array<Record<string, unknown>>;
+  const nbaRecs = recs.filter((r) => (r.events as { sport_key?: string } | null)?.sport_key === "basketball_nba");
+  const mlbRecs = recs.filter((r) => (r.events as { sport_key?: string } | null)?.sport_key === "baseball_mlb");
 
   return (
     <div>
-      {/* Quick Stats Strip */}
+      {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-1.5 lg:gap-3 mt-1">
         {[
           { label: "ARB", value: arbs?.length ?? 0, color: "text-yellow-600" },
@@ -192,46 +136,47 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Desktop: 2-column layout / Mobile: single column */}
-      <div className="lg:grid lg:grid-cols-5 lg:gap-6">
-        {/* Left column: Games (wider) */}
-        <div className="lg:col-span-3">
-          <Section title="Juegos" count={allEvents.length}>
-            {l1 || l2 ? (
-              <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
-            ) : allEvents.length > 0 ? (
-              <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-                {allEvents.map((e) => <GameRow key={e.id} event={e} odds={allOdds} />)}
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-border/50">
-                <p className="text-[12px] lg:text-sm text-gray-400">No hay juegos. Dale "Actualizar".</p>
-              </div>
-            )}
-          </Section>
-        </div>
-
-        {/* Right column: Recommendations + Sims */}
-        <div className="lg:col-span-2">
-          {/* Recommendations */}
-          {recs && recs.length > 0 && (
-            <Section title="Mejores Apuestas" count={recs.length} href="/valor">
-              <div className="space-y-2">
-                {recs.map((r) => <RecCard key={r.id} rec={r as unknown as Record<string, unknown>} />)}
-              </div>
-            </Section>
+      {/* Desktop: 2-column (NBA left, MLB right) / Mobile: stacked */}
+      <div className="lg:grid lg:grid-cols-2 lg:gap-6">
+        {/* NBA Recommendations */}
+        <Section title="🏀 NBA Recomendaciones" count={nbaRecs.length}>
+          {recsLoading ? (
+            <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+          ) : nbaRecs.length > 0 ? (
+            <div className="space-y-2">
+              {nbaRecs.map((r) => <RecCard key={r.id as number} rec={r} />)}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-border/50">
+              <p className="text-[12px] text-gray-400">Sin recomendaciones NBA. Dale Actualizar.</p>
+            </div>
           )}
+        </Section>
 
-          {/* Simulated Bets */}
-          {bets.length > 0 && (
-            <Section title="Simulaciones" count={bets.length} href="/simulaciones">
-              <div className="space-y-2">
-                {bets.map((b) => <SimRow key={b.id as number} bet={b} />)}
-              </div>
-            </Section>
+        {/* MLB Recommendations */}
+        <Section title="⚾ MLB Recomendaciones" count={mlbRecs.length}>
+          {recsLoading ? (
+            <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+          ) : mlbRecs.length > 0 ? (
+            <div className="space-y-2">
+              {mlbRecs.map((r) => <RecCard key={r.id as number} rec={r} />)}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-border/50">
+              <p className="text-[12px] text-gray-400">Sin recomendaciones MLB. Dale Actualizar.</p>
+            </div>
           )}
-        </div>
+        </Section>
       </div>
+
+      {/* Simulated Bets */}
+      {bets.length > 0 && (
+        <Section title="Simulaciones Recientes" count={bets.length} href="/simulaciones">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
+            {bets.map((b) => <SimRow key={b.id as number} bet={b} />)}
+          </div>
+        </Section>
+      )}
 
       <div className="h-4" />
     </div>
