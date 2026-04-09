@@ -6,204 +6,119 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./push-toggle";
 
-const NAV_SECTIONS = [
-  {
-    title: "Principal",
-    items: [
-      { href: "/", label: "Dashboard", icon: "🏠" },
-    ],
-  },
-  {
-    title: "Deportes",
-    items: [
-      { href: "/nba", label: "NBA", icon: "🏀" },
-      { href: "/mlb", label: "MLB", icon: "⚾" },
-    ],
-  },
-  {
-    title: "Analisis",
-    items: [
-      { href: "/arbitraje", label: "Arbitraje", icon: "💰" },
-      { href: "/valor", label: "Valor +EV", icon: "📈" },
-      { href: "/simulaciones", label: "Simulaciones", icon: "🎯" },
-    ],
-  },
-  {
-    title: "Datos",
-    items: [
-      { href: "/expertos", label: "Expertos", icon: "👥" },
-      { href: "/engine", label: "Engine Matrix", icon: "⚙️" },
-    ],
-  },
+const NAV = [
+  { href: "/", label: "Dashboard", short: "Home", icon: "◉" },
+  { href: "/nba", label: "NBA", short: "NBA", icon: "●" },
+  { href: "/mlb", label: "MLB", short: "MLB", icon: "●" },
+  { href: "/simulaciones", label: "Simulaciones", short: "Sims", icon: "◎" },
+  { href: "/arbitraje", label: "Arbitraje", short: "Arb", icon: "◆" },
+  { href: "/valor", label: "Valor +EV", short: "+EV", icon: "▲" },
+  { href: "/expertos", label: "Expertos", short: "Tips", icon: "◇" },
+  { href: "/engine", label: "Engine Matrix", short: "Engine", icon: "⬡" },
 ];
-
-const ALL_TABS = NAV_SECTIONS.flatMap((s) => s.items);
 
 export function Navbar() {
   const pathname = usePathname();
   const [refreshing, setRefreshing] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
 
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      const res = await fetch("/api/refresh", { method: "POST" });
-      await res.json();
+      await fetch("/api/refresh", { method: "POST" });
       window.location.reload();
-    } catch {
-      // silent
-    } finally {
-      setRefreshing(false);
-    }
+    } catch { /* */ }
+    finally { setRefreshing(false); }
+  }
+
+  function isActive(href: string) {
+    return href === "/" ? pathname === "/" : pathname.startsWith(href);
   }
 
   return (
     <>
-      {/* ═══ MOBILE: Top header ═══ */}
-      <header className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-border/50 px-4 h-12 flex items-center justify-between">
-        <h1 className="font-extrabold text-base tracking-tight">
-          <span className="text-blue-600">Apuesta</span>
-          <span className="text-orange-500">zo</span>
-        </h1>
-        <div className="flex items-center gap-2">
+      {/* ══ MOBILE: Header ══ */}
+      <header className="lg:hidden sticky top-0 z-50 h-11 px-4 flex items-center justify-between bg-white border-b border-gray-200">
+        <span className="text-sm font-black tracking-tight text-gray-900">A<span className="text-orange-500">z</span></span>
+        <div className="flex items-center gap-1.5">
           <PushToggle />
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className={cn(
-              "h-7 px-3 text-[11px] rounded-full font-semibold transition-all",
-              refreshing
-                ? "bg-gray-50 text-gray-300 border border-gray-200"
-                : "bg-white text-orange-500 border border-orange-300 shadow-sm active:scale-95"
-            )}
-          >
-            {refreshing ? "..." : "Actualizar"}
+          <button onClick={handleRefresh} disabled={refreshing}
+            className="h-6 px-2.5 text-[10px] font-bold rounded-md bg-gray-900 text-white active:scale-95 transition-transform disabled:opacity-40">
+            {refreshing ? "..." : "SYNC"}
           </button>
         </div>
       </header>
 
-      {/* ═══ MOBILE: Bottom tab bar ═══ */}
-      <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-border/50"
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      >
-        <div className="flex items-center justify-around h-14 px-1">
-          {ALL_TABS.slice(0, 7).map((tab) => {
-            const isActive =
-              tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 w-12 h-11 rounded-xl transition-all active:scale-90",
-                  isActive ? "text-orange-500 bg-orange-50" : "text-gray-400"
-                )}
-              >
-                <span className="text-[16px] leading-none">{tab.icon}</span>
-                <span className="text-[8px] font-semibold leading-none truncate w-full text-center">
-                  {tab.label.length > 7 ? tab.label.slice(0, 6) : tab.label}
-                </span>
-              </Link>
-            );
-          })}
+      {/* ══ MOBILE: Bottom bar ══ */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-200"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        <div className="grid grid-cols-8 h-12">
+          {NAV.map((n) => (
+            <Link key={n.href} href={n.href}
+              className={cn(
+                "flex flex-col items-center justify-center gap-px transition-colors",
+                isActive(n.href) ? "text-orange-500" : "text-gray-400"
+              )}>
+              <span className="text-[14px] leading-none font-bold">{n.icon}</span>
+              <span className="text-[7px] font-bold leading-none">{n.short}</span>
+            </Link>
+          ))}
         </div>
       </nav>
 
-      {/* ═══ DESKTOP: Modern Sidebar ═══ */}
-      <aside
-        className={cn(
-          "hidden lg:flex flex-col fixed left-0 top-0 bottom-0 z-50 transition-all duration-300",
-          collapsed ? "w-16" : "w-60"
-        )}
-      >
-        {/* Glass background */}
-        <div className="absolute inset-0 bg-slate-950/95 backdrop-blur-xl" />
+      {/* ══ DESKTOP: Sidebar ══ */}
+      <aside className="hidden lg:block fixed left-0 top-0 bottom-0 w-[220px] z-50">
+        {/* BG */}
+        <div className="absolute inset-0 bg-[#0c0c0f]" />
 
-        {/* Content */}
-        <div className="relative flex flex-col h-full">
-          {/* Header */}
-          <div className="h-14 flex items-center justify-between px-4 border-b border-white/[0.06]">
-            {!collapsed && (
-              <h1 className="font-extrabold text-lg tracking-tight">
-                <span className="text-blue-400">Apuesta</span>
-                <span className="text-orange-400">zo</span>
-              </h1>
-            )}
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400 transition-colors"
-            >
-              <span className="text-xs">{collapsed ? "▶" : "◀"}</span>
-            </button>
+        <div className="relative h-full flex flex-col">
+          {/* Brand */}
+          <div className="h-14 flex items-center gap-2 px-5">
+            <div className="w-7 h-7 rounded-lg bg-orange-500 flex items-center justify-center">
+              <span className="text-white font-black text-xs">Az</span>
+            </div>
+            <div>
+              <p className="text-[13px] font-bold text-white leading-none">Apuestazo</p>
+              <p className="text-[9px] text-gray-500 leading-none mt-0.5">20 signal engine</p>
+            </div>
           </div>
 
-          {/* Sections */}
-          <nav className="flex-1 py-3 overflow-y-auto">
-            {NAV_SECTIONS.map((section) => (
-              <div key={section.title} className="mb-3">
-                {!collapsed && (
-                  <p className="px-4 mb-1 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
-                    {section.title}
-                  </p>
-                )}
-                <div className="px-2 space-y-0.5">
-                  {section.items.map((item) => {
-                    const isActive =
-                      item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        title={collapsed ? item.label : undefined}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg transition-all duration-200 group",
-                          collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2",
-                          isActive
-                            ? "bg-gradient-to-r from-orange-500/20 to-orange-500/5 text-white"
-                            : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.05]"
-                        )}
-                      >
-                        <span className={cn(
-                          "text-base transition-transform duration-200",
-                          isActive && "scale-110"
-                        )}>
-                          {item.icon}
-                        </span>
-                        {!collapsed && (
-                          <span className="text-[13px] font-medium">{item.label}</span>
-                        )}
-                        {!collapsed && isActive && (
-                          <span className="ml-auto w-1.5 h-5 rounded-full bg-orange-400" />
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+          {/* Nav */}
+          <nav className="flex-1 px-3 py-2 space-y-px overflow-y-auto">
+            {NAV.map((n) => {
+              const active = isActive(n.href);
+              return (
+                <Link key={n.href} href={n.href}
+                  className={cn(
+                    "group flex items-center gap-2.5 h-9 px-3 rounded-lg text-[13px] font-medium transition-all",
+                    active
+                      ? "bg-white/[0.08] text-white"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]"
+                  )}>
+                  <span className={cn(
+                    "w-5 text-center text-[11px] font-bold transition-colors",
+                    active ? "text-orange-400" : "text-gray-600 group-hover:text-gray-400"
+                  )}>{n.icon}</span>
+                  <span>{n.label}</span>
+                  {active && <span className="ml-auto w-1 h-4 rounded-full bg-orange-500" />}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Footer */}
-          <div className="p-3 border-t border-white/[0.06] space-y-2">
-            {!collapsed && (
-              <div className="flex items-center justify-between px-1 mb-1">
-                <PushToggle />
-                <span className="text-[9px] text-slate-500">v1.0</span>
-              </div>
-            )}
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
+          <div className="px-3 pb-4 space-y-2">
+            <div className="flex items-center justify-between px-2">
+              <PushToggle />
+              <span className="text-[9px] text-gray-600 font-mono">v2.0</span>
+            </div>
+            <button onClick={handleRefresh} disabled={refreshing}
               className={cn(
-                "w-full rounded-lg font-semibold transition-all active:scale-[0.97]",
-                collapsed ? "py-2 text-xs" : "py-2.5 text-sm",
+                "w-full h-9 rounded-lg text-[12px] font-bold transition-all",
                 refreshing
-                  ? "bg-white/5 text-slate-600"
-                  : "bg-gradient-to-r from-orange-500 to-orange-400 text-white shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30"
-              )}
-            >
-              {refreshing ? "..." : collapsed ? "↻" : "Actualizar"}
+                  ? "bg-white/5 text-gray-600"
+                  : "bg-white text-[#0c0c0f] hover:bg-gray-100 active:scale-[0.97]"
+              )}>
+              {refreshing ? "Syncing..." : "Actualizar Datos"}
             </button>
           </div>
         </div>

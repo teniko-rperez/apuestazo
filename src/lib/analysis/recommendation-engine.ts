@@ -510,23 +510,40 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
     }
   }
 
-  // ─── Score & Rank All Candidates ───
+  // ─── Score & Rank All Candidates (Optimized) ───
   const results: ScoredRecommendation[] = [];
   const now = Date.now();
 
-  for (const [, c] of candidates) {
-    // Base confidence = average of signal scores
-    const avgScore = c.scores.reduce((a, b) => a + b, 0) / c.scores.length;
+  // Categorize signal types for weighting
+  const MARKET_SIGNALS = new Set(['EV', 'ARB', 'DISCREPANCY', 'CLV', 'STEAM', 'LINE_MOVE']);
+  const DATA_SIGNALS = new Set(['STATS', 'PACE', 'ALTITUDE', 'WEATHER', 'FATIGUE', 'REST', 'HOME', 'STREAK', 'REGRESSION', 'PLAYOFF', 'TANK']);
+  const CROWD_SIGNALS = new Set(['EXPERT', 'ROBINHOOD', 'POLYMARKET', 'CONTRARIAN']);
 
-    // Correlation bonus: more signals = exponentially safer
-    // 1 signal = 1x, 2 signals = 1.4x, 3 signals = 1.8x, 4+ = 2.0x
-    const correlationMultiplier = Math.min(2.0, 1 + (c.signals.length - 1) * 0.3);
+  for (const [, c] of candidates) {
+    // Count unique signal categories (market, data, crowd)
+    const hasMarket = c.signals.some((s) => MARKET_SIGNALS.has(s));
+    const hasData = c.signals.some((s) => DATA_SIGNALS.has(s));
+    const hasCrowd = c.signals.some((s) => CROWD_SIGNALS.has(s));
+    const categoryCount = (hasMarket ? 1 : 0) + (hasData ? 1 : 0) + (hasCrowd ? 1 : 0);
+
+    // Weighted average of signal scores (higher scores weight more)
+    const sorted = [...c.scores].sort((a, b) => b - a);
+    const weightedSum = sorted.reduce((s, v, i) => s + v * (1 / (i + 1)), 0);
+    const weightTotal = sorted.reduce((s, _, i) => s + 1 / (i + 1), 0);
+    const weightedAvg = weightedSum / weightTotal;
+
+    // Correlation multiplier: diversity of signal categories matters most
+    // 1 category = 1x, 2 categories = 1.5x, 3 categories = 2.2x
+    const diversityBonus = categoryCount === 3 ? 2.2 : categoryCount === 2 ? 1.5 : 1.0;
+
+    // Volume bonus: more total signals = slightly safer
+    const volumeBonus = Math.min(1.5, 1 + (c.signals.length - 1) * 0.1);
 
     // Final confidence
-    const confidence = Math.min(0.98, avgScore * correlationMultiplier);
+    const confidence = Math.min(0.98, weightedAvg * diversityBonus * volumeBonus);
 
     // Skip low confidence
-    if (confidence < 0.15) continue;
+    if (confidence < 0.12) continue;
 
     // Determine type
     let type = 'value';
@@ -535,9 +552,15 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
     else if (c.signals.includes('STEAM')) type = 'steam';
     else if (c.signals.includes('EXPERT') && c.signals.length >= 2) type = 'expert';
 
-    // Build reasoning
-    const signalSummary = c.signals.join(' + ');
-    const reasoning = `[${signalSummary}] ${c.reasonParts.join('. ')}.`;
+    // Build reasoning with safety label
+    const uniqueSignals = [...new Set(c.signals)];
+    const signalSummary = uniqueSignals.join(' + ');
+    const safetyLabel = categoryCount === 3 && c.signals.length >= 4
+      ? '🔒 MAS SEGURA | '
+      : categoryCount >= 2 && c.signals.length >= 3
+        ? '✅ SEGURA | '
+        : '';
+    const reasoning = `${safetyLabel}[${signalSummary}] (${categoryCount}/3 categorias, ${c.signals.length} senales) ${c.reasonParts.slice(0, 4).join('. ')}.`;
 
     results.push({
       event_id: c.event_id,
@@ -549,12 +572,12 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
       reasoning,
       confidence_score: Math.round(confidence * 100) / 100,
       valid_until: new Date(now + 3 * 60 * 60 * 1000).toISOString(),
-      signals: c.signals,
+      signals: uniqueSignals,
       signal_count: c.signals.length,
     });
   }
 
-  // Sort by: signal_count DESC, then confidence DESC
+  // Sort by: category diversity DESC, signal_count DESC, confidence DESC
   results.sort((a, b) => {
     if (b.signal_count !== a.signal_count) return b.signal_count - a.signal_count;
     return b.confidence_score - a.confidence_score;

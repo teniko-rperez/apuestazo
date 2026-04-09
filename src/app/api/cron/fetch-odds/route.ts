@@ -303,16 +303,30 @@ export async function GET(request: Request) {
       summary.recommendations = engineRecs.length;
     }
 
-    // ═══ PHASE 4: SIMULATED BETS ═══
-    const { data: allRecs } = await supabase.from('recommendations').select('*').gte('valid_until', new Date().toISOString()).order('confidence_score', { ascending: false });
+    // ═══ PHASE 4: SIMULATED BETS (1 per game, moneyline only) ═══
+    const { data: allRecs } = await supabase.from('recommendations').select('*')
+      .eq('market_key', 'h2h') // Only moneyline (who wins)
+      .gte('valid_until', new Date().toISOString())
+      .order('confidence_score', { ascending: false });
     if (allRecs && allRecs.length > 0) {
+      // Best moneyline rec per event (1 bet per game)
       const bestPerEvent = new Map<string, typeof allRecs[0]>();
-      for (const rec of allRecs) { if (rec.event_id && !bestPerEvent.has(rec.event_id)) bestPerEvent.set(rec.event_id, rec); }
+      for (const rec of allRecs) {
+        if (rec.event_id && !bestPerEvent.has(rec.event_id)) {
+          bestPerEvent.set(rec.event_id, rec);
+        }
+      }
       let created = 0;
-      for (const [, rec] of bestPerEvent) {
-        const { data: ex } = await supabase.from('simulated_bets').select('id').eq('event_id', rec.event_id).eq('outcome_name', rec.outcome_name).eq('market_key', rec.market_key).limit(1);
+      for (const [eventId, rec] of bestPerEvent) {
+        // Check no existing bet for this event (any market)
+        const { data: ex } = await supabase.from('simulated_bets').select('id').eq('event_id', eventId).limit(1);
         if (!ex || ex.length === 0) {
-          await supabase.from('simulated_bets').insert({ event_id: rec.event_id, market_key: rec.market_key, outcome_name: rec.outcome_name, bookmaker_key: rec.bookmaker_key, odds: rec.odds, stake: 100, source: rec.type, reasoning: rec.reasoning, result: 'pending' });
+          await supabase.from('simulated_bets').insert({
+            event_id: rec.event_id, market_key: 'h2h',
+            outcome_name: rec.outcome_name, bookmaker_key: rec.bookmaker_key,
+            odds: rec.odds, stake: 100, source: rec.type,
+            reasoning: rec.reasoning, result: 'pending',
+          });
           created++;
         }
       }
