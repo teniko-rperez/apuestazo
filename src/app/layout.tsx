@@ -40,7 +40,7 @@ export default function RootLayout({
         <Navbar />
         {/* Mobile: full width with bottom padding for nav */}
         {/* Desktop: offset left for sidebar, centered content */}
-        <main className="flex-1 px-3 pt-3 pb-safe w-full max-w-md mx-auto lg:max-w-6xl lg:ml-[78px] lg:mr-auto lg:px-8 lg:pt-5">
+        <main className="flex-1 px-3 pt-3 pb-safe w-full max-w-md mx-auto lg:max-w-6xl lg:ml-[230px] lg:mr-auto lg:px-8 lg:pt-5">
           {children}
         </main>
       </body>

@@ -73,15 +73,8 @@ export function Navbar() {
         </div>
       </nav>
 
-      {/* ═══ DESKTOP: Hoverable Sidebar ═══ */}
-      <aside
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
-        className={cn(
-          "hidden lg:flex flex-col fixed left-0 top-0 bottom-0 z-50 bg-white border-r border-gray-100 transition-all duration-300 ease-in-out overflow-hidden",
-          expanded ? "w-[220px] shadow-xl shadow-black/5" : "w-[68px]"
-        )}
-      >
+      {/* ═══ DESKTOP: Fixed Sidebar ═══ */}
+      <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 z-50 w-[220px] bg-white border-r border-gray-100 shadow-sm">
         {/* Brand */}
         <div className="h-14 flex items-center gap-3 px-4 shrink-0">
           <div className="w-9 h-9 rounded-xl bg-blue-500 flex items-center justify-center shrink-0">
@@ -89,7 +82,7 @@ export function Navbar() {
           </div>
           <span className={cn(
             "text-[15px] font-extrabold text-gray-800 whitespace-nowrap transition-opacity duration-200",
-            expanded ? "opacity-100" : "opacity-0"
+            "opacity-100"
           )}>
             Apuestazo
           </span>
@@ -99,7 +92,7 @@ export function Navbar() {
         <div className="px-3 mt-2">
           <p className={cn(
             "text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2 transition-opacity duration-200",
-            expanded ? "opacity-100" : "opacity-0"
+            "opacity-100"
           )}>Principal</p>
           <div className="h-px bg-gray-100 mb-2" />
         </div>
@@ -108,10 +101,10 @@ export function Navbar() {
           {MAIN_NAV.map((n) => {
             const active = isActive(n.href);
             return (
-              <Link key={n.href} href={n.href} title={!expanded ? n.label : undefined}
+              <Link key={n.href} href={n.href} title={undefined}
                 className={cn(
                   "group flex items-center gap-3 h-10 rounded-xl transition-all duration-200",
-                  expanded ? "px-3" : "px-0 justify-center",
+                  "px-3",
                   active
                     ? "bg-blue-500 text-white shadow-md shadow-blue-500/25"
                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
@@ -119,7 +112,7 @@ export function Navbar() {
                 <span className="text-[17px] shrink-0">{n.icon}</span>
                 <span className={cn(
                   "text-[13px] font-medium whitespace-nowrap transition-opacity duration-200",
-                  expanded ? "opacity-100" : "opacity-0 w-0"
+                  "opacity-100"
                 )}>{n.label}</span>
               </Link>
             );
@@ -130,7 +123,7 @@ export function Navbar() {
         <div className="px-3 mt-4">
           <p className={cn(
             "text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2 transition-opacity duration-200",
-            expanded ? "opacity-100" : "opacity-0"
+            "opacity-100"
           )}>Otros</p>
           <div className="h-px bg-gray-100 mb-2" />
         </div>
@@ -139,10 +132,10 @@ export function Navbar() {
           {OTHER_NAV.map((n) => {
             const active = isActive(n.href);
             return (
-              <Link key={n.href} href={n.href} title={!expanded ? n.label : undefined}
+              <Link key={n.href} href={n.href} title={undefined}
                 className={cn(
                   "group flex items-center gap-3 h-10 rounded-xl transition-all duration-200",
-                  expanded ? "px-3" : "px-0 justify-center",
+                  "px-3",
                   active
                     ? "bg-blue-500 text-white shadow-md shadow-blue-500/25"
                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
@@ -150,7 +143,7 @@ export function Navbar() {
                 <span className="text-[17px] shrink-0">{n.icon}</span>
                 <span className={cn(
                   "text-[13px] font-medium whitespace-nowrap transition-opacity duration-200",
-                  expanded ? "opacity-100" : "opacity-0 w-0"
+                  "opacity-100"
                 )}>{n.label}</span>
               </Link>
             );
@@ -165,12 +158,12 @@ export function Navbar() {
           <button onClick={handleRefresh} disabled={refreshing}
             className={cn(
               "w-full rounded-xl font-bold transition-all active:scale-[0.97]",
-              expanded ? "h-10 text-[12px]" : "h-10 text-[14px]",
+              "h-10 text-[12px]",
               refreshing
                 ? "bg-gray-50 text-gray-400"
                 : "bg-blue-500 text-white shadow-md shadow-blue-500/25 hover:bg-blue-600"
             )}>
-            {refreshing ? "..." : expanded ? "⚡ Actualizar" : "⚡"}
+            {refreshing ? "..." : "⚡ Actualizar Datos"}
           </button>
         </div>
       </aside>

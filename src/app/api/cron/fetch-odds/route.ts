@@ -12,6 +12,7 @@ import type { LatestOdds, OddsSnapshot } from '@/types/odds';
 import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
 import { fetchNbaTeamStats, fetchMlbTeamStats } from '@/lib/scrapers/stats';
 import { detectFatigue, computeHomeAdvantage, computePace, computeAltitude, computeCLV, detectStreak, computePlayoffMotivation, type FatigueSignal, type HomeAwaySignal, type PaceSignal, type AltitudeSignal, type CLVSignal, type StreakSignal, type PlayoffSignal } from '@/lib/analysis/advanced-signals';
+import { learnFromHistory, shouldCancelBet } from '@/lib/analysis/learning-engine';
 import { fetchGameWeather } from '@/lib/scrapers/weather';
 import { fetchPolymarketSports } from '@/lib/scrapers/polymarket';
 import type { WeatherData } from '@/lib/scrapers/weather';
@@ -302,6 +303,81 @@ export async function GET(request: Request) {
       }
       summary.recommendations = engineRecs.length;
     }
+
+    // ═══ PHASE 3.5: SELF-LEARNING (analyze past results, adjust weights) ═══
+    const { data: settledBets } = await supabase.from('simulated_bets').select('result, profit, reasoning, confidence_score:events(confidence_score)')
+      .in('result', ['won', 'lost', 'push']).limit(500);
+
+    // Flatten and type the settled bets for learning
+    const learningInput = (settledBets ?? []).map((b: Record<string, unknown>) => ({
+      result: b.result as 'won' | 'lost' | 'push',
+      profit: (b.profit as number) ?? 0,
+      reasoning: (b.reasoning as string) ?? '',
+      confidence_score: undefined as number | undefined,
+    }));
+
+    const learnedConfig = learnFromHistory(learningInput);
+    summary.learning = {
+      betsAnalyzed: learnedConfig.total_bets_analyzed,
+      overallWinRate: `${(learnedConfig.overall_win_rate * 100).toFixed(0)}%`,
+      minConfidence: learnedConfig.min_confidence,
+      minSignals: learnedConfig.min_signals,
+      minCategories: learnedConfig.min_categories,
+      bestCombos: learnedConfig.best_combos.length,
+      worstCombos: learnedConfig.worst_combos.length,
+    };
+
+    // Store learning history
+    try {
+      // Calculate what changed from default weights
+      const changes: Record<string, { from: number; to: number; reason: string }> = {};
+      for (const [signal, weight] of Object.entries(learnedConfig.signal_weights)) {
+        const defaultW = 0.12; // base default
+        if (Math.abs(weight - defaultW) > 0.02) {
+          changes[signal] = { from: defaultW, to: weight, reason: weight > defaultW ? 'Win rate alta, peso aumentado' : 'Win rate baja, peso reducido' };
+        }
+      }
+      await supabase.from('learning_history').insert({
+        config: learnedConfig,
+        signal_changes: changes,
+        bets_analyzed: learnedConfig.total_bets_analyzed,
+        win_rate: learnedConfig.overall_win_rate,
+      });
+    } catch { /* table may not exist yet */ }
+
+    // Cancel pending bets that no longer meet learned thresholds
+    const { data: pendingForCancel } = await supabase.from('simulated_bets').select('id, reasoning, event_id')
+      .eq('result', 'pending');
+
+    let cancelled = 0;
+    if (pendingForCancel) {
+      for (const bet of pendingForCancel) {
+        // Check if game already started
+        const { data: ev } = await supabase.from('events').select('commence_time').eq('id', bet.event_id).single();
+        if (ev && new Date(ev.commence_time as string).getTime() < Date.now()) continue; // Already started, don't cancel
+
+        // Check if bet still has a matching recommendation
+        const { data: matchingRec } = await supabase.from('recommendations').select('confidence_score, reasoning')
+          .eq('event_id', bet.event_id).gte('valid_until', new Date().toISOString())
+          .order('confidence_score', { ascending: false }).limit(1);
+
+        if (!matchingRec || matchingRec.length === 0) {
+          // No more recommendations for this event = cancel
+          await supabase.from('simulated_bets').update({ result: 'push', profit: 0, reasoning: (bet.reasoning ?? '') + ' [CANCELADA: sin recomendacion activa]', settled_at: new Date().toISOString() }).eq('id', bet.id);
+          cancelled++;
+          continue;
+        }
+
+        // Check if recommendation meets learned thresholds
+        const topRec = matchingRec[0];
+        const { cancel, reason } = shouldCancelBet(topRec.reasoning as string, topRec.confidence_score as number, learnedConfig);
+        if (cancel) {
+          await supabase.from('simulated_bets').update({ result: 'push', profit: 0, reasoning: (bet.reasoning ?? '') + ` [CANCELADA: ${reason}]`, settled_at: new Date().toISOString() }).eq('id', bet.id);
+          cancelled++;
+        }
+      }
+    }
+    summary.betsCancelled = cancelled;
 
     // ═══ PHASE 4: SIMULATED BETS (1 per game, moneyline only) ═══
     const { data: allRecs } = await supabase.from('recommendations').select('*')

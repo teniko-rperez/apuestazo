@@ -64,9 +64,11 @@ function cleanReasoning(r?: string): string {
 
 function BetRow({ bet }: { bet: SimBet }) {
   const [open, setOpen] = useState(false);
-  const rColor = bet.result === "won" ? "text-green-600" : bet.result === "lost" ? "text-red-500" : "text-blue-600";
-  const rBg = bet.result === "won" ? "bg-green-50" : bet.result === "lost" ? "bg-red-50" : "bg-blue-50";
-  const borderColor = bet.result === "won" ? "border-l-green-500" : bet.result === "lost" ? "border-l-red-500" : "border-l-blue-400";
+  const isCancelled = bet.reasoning?.includes('[CANCELADA');
+  const cancelReason = bet.reasoning?.match(/\[CANCELADA: ([^\]]+)\]/)?.[1] ?? '';
+  const rColor = isCancelled ? "text-gray-500" : bet.result === "won" ? "text-green-600" : bet.result === "lost" ? "text-red-500" : "text-blue-600";
+  const rBg = isCancelled ? "bg-gray-100" : bet.result === "won" ? "bg-green-50" : bet.result === "lost" ? "bg-red-50" : "bg-blue-50";
+  const borderColor = isCancelled ? "border-l-gray-400" : bet.result === "won" ? "border-l-green-500" : bet.result === "lost" ? "border-l-red-500" : "border-l-blue-400";
 
   // Parse signals from reasoning
   const signals = bet.reasoning?.match(/\[([^\]]+)\]/)?.[1]?.split(' + ') ?? [];
@@ -84,13 +86,20 @@ function BetRow({ bet }: { bet: SimBet }) {
           </span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            {bet.result === "won" && <Badge className="bg-green-100 text-green-700 text-[9px] h-4 px-1.5 font-bold">GANADA</Badge>}
-            {bet.result === "lost" && <Badge className="bg-red-100 text-red-600 text-[9px] h-4 px-1.5 font-bold">PERDIDA</Badge>}
-            {bet.result === "push" && <Badge className="bg-yellow-100 text-yellow-700 text-[9px] h-4 px-1.5 font-bold">EMPATE</Badge>}
-            {bet.result === "pending" && <Badge className="bg-blue-50 text-blue-600 text-[9px] h-4 px-1.5">PENDIENTE</Badge>}
-            {isSafe && <Badge className="bg-green-100 text-green-700 text-[8px] h-4 px-1">MAS SEGURA</Badge>}
-            {isSecure && <Badge className="bg-blue-100 text-blue-700 text-[8px] h-4 px-1">SEGURA</Badge>}
+          <div className="flex items-center gap-1 mb-0.5 flex-wrap">
+            {isCancelled ? (
+              <Badge className="bg-gray-200 text-gray-600 text-[9px] h-4 px-1.5 font-bold">CANCELADA</Badge>
+            ) : (
+              <>
+                {bet.result === "won" && <Badge className="bg-green-100 text-green-700 text-[9px] h-4 px-1.5 font-bold">GANADA</Badge>}
+                {bet.result === "lost" && <Badge className="bg-red-100 text-red-600 text-[9px] h-4 px-1.5 font-bold">PERDIDA</Badge>}
+                {bet.result === "push" && <Badge className="bg-yellow-100 text-yellow-700 text-[9px] h-4 px-1.5 font-bold">EMPATE</Badge>}
+                {bet.result === "pending" && <Badge className="bg-blue-50 text-blue-600 text-[9px] h-4 px-1.5">PENDIENTE</Badge>}
+                {isSafe && <Badge className="bg-green-100 text-green-700 text-[8px] h-4 px-1">MAS SEGURA</Badge>}
+                {isSecure && <Badge className="bg-blue-100 text-blue-700 text-[8px] h-4 px-1">SEGURA</Badge>}
+              </>
+            )}
+            {isCancelled && cancelReason && <span className="text-[8px] text-gray-400">{cancelReason}</span>}
             {bet.events?.commence_time && (
               <span className="text-[9px] text-gray-400">
                 {new Date(bet.events.commence_time).toLocaleDateString("es-PR", { month: "short", day: "numeric" })}{" "}

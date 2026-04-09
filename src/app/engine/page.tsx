@@ -87,14 +87,30 @@ function useEngineStats() {
   });
 }
 
+function useLearningHistory() {
+  return useSWR("learning-history", async () => {
+    const s = getClient();
+    const { data } = await s.from("learning_history").select("*").order("created_at", { ascending: false }).limit(10);
+    return (data ?? []) as Array<{
+      id: number;
+      config: Record<string, unknown>;
+      signal_changes: Record<string, { from: number; to: number; reason: string }>;
+      bets_analyzed: number;
+      win_rate: number;
+      created_at: string;
+    }>;
+  });
+}
+
 export default function EnginePage() {
   const { data: stats } = useEngineStats();
+  const { data: history } = useLearningHistory();
 
   return (
     <div>
       <h1 className="text-base lg:text-xl font-bold text-gray-800 mt-1 mb-1">Engine Matrix</h1>
       <p className="text-[11px] text-gray-400 mb-4">
-        {SIGNALS.length} senales correlacionadas para encontrar las apuestas mas seguras
+        {SIGNALS.length} senales + auto-aprendizaje para encontrar las apuestas mas seguras
       </p>
 
       {/* How it works */}
@@ -160,6 +176,85 @@ export default function EnginePage() {
             </div>
           );
         })}
+      </div>
+
+      {/* Learning History */}
+      <div className="mt-6">
+        <h2 className="text-[13px] font-bold text-gray-800 uppercase tracking-wide mb-3 px-1">
+          Auto-Aprendizaje {history && history.length > 0 && <span className="text-orange-500 normal-case">({history.length} updates)</span>}
+        </h2>
+
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-border/50 mb-3">
+          <h3 className="text-[12px] font-bold text-gray-700 mb-2">Como Aprende</h3>
+          <div className="space-y-1.5 text-[11px] text-gray-500 leading-relaxed">
+            <p><span className="font-bold text-blue-600">1.</span> Analiza todas las apuestas liquidadas (ganadas/perdidas)</p>
+            <p><span className="font-bold text-blue-600">2.</span> Calcula win rate por cada senal individual</p>
+            <p><span className="font-bold text-blue-600">3.</span> Senales con {">"} 60% win rate = peso aumentado, {"<"} 40% = peso reducido</p>
+            <p><span className="font-bold text-blue-600">4.</span> Encuentra combos ganadores y perdedores</p>
+            <p><span className="font-bold text-blue-600">5.</span> Ajusta confianza minima para crear apuestas</p>
+            <p><span className="font-bold text-blue-600">6.</span> Cancela apuestas pendientes que no cumplan los nuevos umbrales</p>
+          </div>
+        </div>
+
+        {history && history.length > 0 ? (
+          <div className="space-y-2">
+            {history.map((h) => {
+              const config = h.config as Record<string, unknown>;
+              const changes = h.signal_changes ?? {};
+              const changeCount = Object.keys(changes).length;
+              const bestCombos = (config.best_combos as string[]) ?? [];
+              const worstCombos = (config.worst_combos as string[]) ?? [];
+
+              return (
+                <div key={h.id} className="bg-white rounded-2xl p-3 shadow-sm border border-border/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-gray-400">
+                      {new Date(h.created_at).toLocaleString("es-PR", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-gray-600">{h.bets_analyzed} analizadas</span>
+                      <span className={`text-[10px] font-bold ${h.win_rate >= 0.5 ? "text-green-600" : "text-red-500"}`}>
+                        {(h.win_rate * 100).toFixed(0)}% win rate
+                      </span>
+                    </div>
+                  </div>
+
+                  {changeCount > 0 && (
+                    <div className="mb-2">
+                      <p className="text-[10px] font-bold text-gray-600 mb-1">Cambios de peso ({changeCount}):</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(changes).map(([signal, change]) => (
+                          <span key={signal} className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                            change.to > change.from ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
+                          }`}>
+                            {signal}: {change.to > change.from ? "↑" : "↓"} {(change.to * 100).toFixed(0)}%
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 text-[9px]">
+                    <span className="text-gray-400">Min conf: {((config.min_confidence as number) * 100).toFixed(0)}%</span>
+                    <span className="text-gray-400">Min senales: {config.min_signals as number}</span>
+                    <span className="text-gray-400">Min cats: {config.min_categories as number}</span>
+                  </div>
+
+                  {bestCombos.length > 0 && (
+                    <p className="text-[9px] text-green-600 mt-1">Mejores combos: {bestCombos.join(', ')}</p>
+                  )}
+                  {worstCombos.length > 0 && (
+                    <p className="text-[9px] text-red-500 mt-0.5">Evitar combos: {worstCombos.join(', ')}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-border/50">
+            <p className="text-[12px] text-gray-400">El aprendizaje comienza cuando haya suficientes apuestas liquidadas (5+).</p>
+          </div>
+        )}
       </div>
 
       <div className="h-4" />
