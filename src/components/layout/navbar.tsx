@@ -88,9 +88,9 @@ export function Navbar() {
       </nav>
 
       {/* ═══ DESKTOP: Sidebar ═══ */}
-      <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-52 bg-gray-900 z-50">
+      <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-56 bg-gradient-to-b from-slate-900 to-slate-950 z-50">
         {/* Logo */}
-        <div className="h-16 flex items-center px-5 border-b border-gray-800">
+        <div className="h-16 flex items-center px-5 border-b border-white/10">
           <h1 className="font-extrabold text-xl tracking-tight">
             <span className="text-blue-400">Apuesta</span>
             <span className="text-orange-400">zo</span>
@@ -98,7 +98,7 @@ export function Navbar() {
         </div>
 
         {/* Nav links */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {TABS.map((tab) => {
             const isActive =
               tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
@@ -107,32 +107,36 @@ export function Navbar() {
                 key={tab.href}
                 href={tab.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all",
                   isActive
-                    ? "bg-orange-500/20 text-orange-400"
-                    : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                    ? "bg-white/10 text-white shadow-sm shadow-black/20"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 )}
               >
-                <span className="text-lg">{tab.icon}</span>
+                <span className="text-base">{tab.icon}</span>
                 <span>{tab.label}</span>
+                {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-orange-400" />}
               </Link>
             );
           })}
         </nav>
 
-        {/* Refresh button */}
-        <div className="p-4 border-t border-gray-800">
+        {/* Push + Refresh */}
+        <div className="p-4 border-t border-white/10 space-y-2">
+          <div className="flex justify-center">
+            <PushToggle />
+          </div>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
             className={cn(
               "w-full py-2.5 rounded-xl text-sm font-semibold transition-all",
               refreshing
-                ? "bg-gray-50 text-gray-300 border border-gray-200"
-                : "bg-white text-orange-500 border border-orange-300 shadow-sm hover:bg-orange-50 active:scale-[0.98]"
+                ? "bg-white/5 text-slate-500"
+                : "bg-white text-slate-900 shadow-sm hover:bg-slate-100 active:scale-[0.98]"
             )}
           >
-            {refreshing ? "Actualizando..." : "Actualizar Datos"}
+            {refreshing ? "..." : "Actualizar"}
           </button>
         </div>
       </aside>
