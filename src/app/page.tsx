@@ -7,7 +7,7 @@ import { useRecommendations } from "@/hooks/use-recommendations";
 import { useArbitrageOpportunities, useEvOpportunities } from "@/hooks/use-arbitrage";
 import { useEvents, useSportOdds } from "@/hooks/use-odds";
 import { BOOKMAKERS } from "@/lib/constants";
-import { formatOdds } from "@/lib/analysis/implied-probability";
+import { formatOdds, explainOdds } from "@/lib/analysis/implied-probability";
 import type { GameEvent } from "@/types/event";
 import type { LatestOdds, Outcome } from "@/types/odds";
 import useSWR from "swr";
@@ -120,6 +120,9 @@ function SimRow({ bet }: { bet: Record<string, unknown> }) {
       </div>
       <div className="text-right shrink-0">
         <p className="text-[12px] font-bold font-mono text-orange-500">{formatOdds(bet.odds as number)}</p>
+        {(bet.odds as number) !== 0 && (
+          <p className="text-[8px] text-gray-400">{explainOdds(bet.odds as number, 50)}</p>
+        )}
         {profit != null && (
           <p className={`text-[12px] font-bold font-mono ${profit >= 0 ? "text-green-600" : "text-red-500"}`}>
             {profit >= 0 ? "+" : ""}${profit.toFixed(0)}

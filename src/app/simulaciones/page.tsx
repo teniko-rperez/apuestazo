@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getClient } from "@/lib/supabase/client";
 import { BOOKMAKERS, MARKET_LABELS } from "@/lib/constants";
-import { formatOdds } from "@/lib/analysis/implied-probability";
+import { formatOdds, explainOdds } from "@/lib/analysis/implied-probability";
 
 interface SimBet {
   id: number;
@@ -85,6 +85,9 @@ function BetRow({ bet }: { bet: SimBet }) {
       </div>
       <div className="text-right shrink-0">
         <p className="text-[13px] font-bold font-mono text-orange-500">{formatOdds(bet.odds)}</p>
+        {bet.odds !== 0 && (
+          <p className="text-[9px] text-gray-400">{explainOdds(bet.odds, bet.stake)}</p>
+        )}
         {bet.profit != null && (
           <p className={`text-[12px] font-bold font-mono ${bet.profit >= 0 ? "text-green-600" : "text-red-500"}`}>
             {bet.profit >= 0 ? "+" : ""}${bet.profit.toFixed(0)}

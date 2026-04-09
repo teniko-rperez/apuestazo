@@ -63,6 +63,18 @@ export function kellyFraction(edge: number, decimalOdds: number): number {
   return Math.max(0, fraction * 0.25);
 }
 
+/** Explain odds in simple Spanish for a given stake */
+export function explainOdds(odds: number, stake: number = 50): string {
+  if (odds === 0) return '';
+  if (odds > 0) {
+    const profit = (odds / 100) * stake;
+    return `Apostar $${stake} para ganar $${profit.toFixed(2)}`;
+  } else {
+    const profit = (100 / Math.abs(odds)) * stake;
+    return `Apostar $${stake} para ganar $${profit.toFixed(2)}`;
+  }
+}
+
 /** Calculate total implied probability for arbitrage detection */
 export function totalImpliedProbability(americanOdds: number[]): number {
   return americanOdds.reduce((sum, odds) => sum + americanToImplied(odds), 0);

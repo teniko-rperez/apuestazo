@@ -306,6 +306,7 @@ export async function GET(request: Request) {
     // ═══ PHASE 4: SIMULATED BETS (1 per game, moneyline only) ═══
     const { data: allRecs } = await supabase.from('recommendations').select('*')
       .eq('market_key', 'h2h') // Only moneyline (who wins)
+      .neq('odds', 0) // Must have valid odds
       .gte('valid_until', new Date().toISOString())
       .order('confidence_score', { ascending: false });
     if (allRecs && allRecs.length > 0) {
