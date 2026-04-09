@@ -186,31 +186,50 @@ export async function GET(request: Request) {
       const { data: kalshiData } = await supabase.from('robinhood_contracts').select('*').gte('scraped_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString());
       const kalshiContracts = (kalshiData ?? []) as unknown as import('@/lib/scrapers/kalshi').KalshiContract[];
 
-      // Fetch team stats for upcoming games
+      // Fetch team stats - only for today's upcoming games (limit API calls)
       const teamStats = new Map<string, { win_pct: number; avg_points?: number; recent_form?: string }>();
-      for (const [, teams] of eventTeams) {
-        for (const teamName of [teams.home_team, teams.away_team]) {
-          if (teamStats.has(teamName)) continue;
-          try {
-            const nba = await fetchNbaTeamStats(teamName);
-            if (nba) { teamStats.set(teamName, { win_pct: nba.win_pct, avg_points: nba.avg_points, recent_form: nba.recent_form }); continue; }
-            const mlb = await fetchMlbTeamStats(teamName);
-            if (mlb) { teamStats.set(teamName, { win_pct: mlb.win_pct }); }
-          } catch { /* ok */ }
+      const upcomingEvents = [...eventTeams.entries()].slice(0, 20); // Max 20 events
+      const uniqueTeams = new Set<string>();
+      for (const [, t] of upcomingEvents) { uniqueTeams.add(t.home_team); uniqueTeams.add(t.away_team); }
+
+      // Batch: fetch MLB standings once (covers all MLB teams)
+      try {
+        const mlbRes = await fetch('https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season=2026&standingsTypes=regularSeason', { signal: AbortSignal.timeout(3000) });
+        if (mlbRes.ok) {
+          const mlbData = await mlbRes.json() as { records: Array<{ teamRecords: Array<{ team: { name: string }; wins: number; losses: number; winningPercentage: string }> }> };
+          for (const rec of mlbData.records ?? []) {
+            for (const t of rec.teamRecords ?? []) {
+              if (uniqueTeams.has(t.team.name)) {
+                teamStats.set(t.team.name, { win_pct: parseFloat(t.winningPercentage) || t.wins / (t.wins + t.losses) });
+              }
+            }
+          }
         }
+      } catch { /* ok */ }
+
+      // NBA stats: only fetch for teams not already covered (max 10 API calls)
+      let nbaCallCount = 0;
+      for (const teamName of uniqueTeams) {
+        if (teamStats.has(teamName) || nbaCallCount >= 10) continue;
+        try {
+          const nba = await fetchNbaTeamStats(teamName);
+          if (nba) { teamStats.set(teamName, { win_pct: nba.win_pct, avg_points: nba.avg_points, recent_form: nba.recent_form }); }
+          nbaCallCount++;
+        } catch { /* ok */ }
       }
       summary.teamStats = teamStats.size;
 
-      // Fetch weather for outdoor MLB games
+      // Fetch weather for outdoor MLB games (only next 6 hours to limit API calls)
       const weatherMap = new Map<string, WeatherData>();
-      for (const [eventId, teams] of eventTeams) {
-        if (!eventId.startsWith('espn_')) continue;
+      const sixHoursFromNow = Date.now() + 6 * 60 * 60 * 1000;
+      const { data: upcomingMlb } = await supabase.from('events').select('id, home_team, commence_time')
+        .eq('sport_key', 'baseball_mlb').eq('completed', false)
+        .lte('commence_time', new Date(sixHoursFromNow).toISOString())
+        .gte('commence_time', new Date().toISOString()).limit(10);
+      for (const mlbEv of upcomingMlb ?? []) {
         try {
-          const { data: ev } = await supabase.from('events').select('commence_time, sport_key').eq('id', eventId).single();
-          if (ev?.sport_key === 'baseball_mlb') {
-            const w = await fetchGameWeather(teams.home_team, ev.commence_time);
-            if (w) weatherMap.set(eventId, w);
-          }
+          const w = await fetchGameWeather(mlbEv.home_team, mlbEv.commence_time);
+          if (w) weatherMap.set(mlbEv.id, w);
         } catch { /* ok */ }
       }
       summary.weatherData = weatherMap.size;
@@ -231,8 +250,14 @@ export async function GET(request: Request) {
       const streakSignals: StreakSignal[] = [];
       const playoffSignals: PlayoffSignal[] = [];
 
+      // Batch fetch all events with sport_key for advanced signals
+      const { data: allEventsForSignals } = await supabase.from('events').select('id, commence_time, sport_key, home_team, away_team, completed, scores').limit(200);
+      const eventsMap = new Map<string, { commence_time: string; sport_key: string; completed: boolean }>();
+      const allEventsList = allEventsForSignals ?? [];
+      for (const e of allEventsList) eventsMap.set(e.id, { commence_time: e.commence_time, sport_key: e.sport_key, completed: e.completed });
+
       for (const [eventId, teams] of eventTeams) {
-        const { data: ev } = await supabase.from('events').select('commence_time, sport_key').eq('id', eventId).single();
+        const ev = eventsMap.get(eventId);
         if (!ev) continue;
 
         // Home/Away
@@ -249,23 +274,24 @@ export async function GET(request: Request) {
           altitudeSignals.push(computeAltitude(eventId, teams.home_team));
         }
 
-        // Fatigue - check recent games for each team
+        // Fatigue - use cached events list instead of per-team query
         for (const teamName of [teams.home_team, teams.away_team]) {
-          const { data: teamGames } = await supabase.from('events').select('commence_time, completed')
-            .or(`home_team.eq.${teamName},away_team.eq.${teamName}`)
-            .order('commence_time', { ascending: false }).limit(5);
-          if (teamGames) {
+          const teamGames = allEventsList
+            .filter((g) => (g.home_team === teamName || g.away_team === teamName) && g.completed)
+            .sort((a, b) => new Date(b.commence_time).getTime() - new Date(a.commence_time).getTime())
+            .slice(0, 5);
+          if (teamGames.length > 0) {
             fatigueSignals.push(detectFatigue(eventId, teamName, teamGames, ev.commence_time));
           }
         }
 
-        // Streaks
+        // Streaks - use cached events
         for (const teamName of [teams.home_team, teams.away_team]) {
-          const { data: recentGames } = await supabase.from('events').select('home_team, scores, completed')
-            .or(`home_team.eq.${teamName},away_team.eq.${teamName}`)
-            .eq('completed', true)
-            .order('commence_time', { ascending: false }).limit(10);
-          if (recentGames && recentGames.length >= 3) {
+          const recentGames = allEventsList
+            .filter((g) => (g.home_team === teamName || g.away_team === teamName) && g.completed && g.scores)
+            .sort((a, b) => new Date(b.commence_time).getTime() - new Date(a.commence_time).getTime())
+            .slice(0, 10);
+          if (recentGames.length >= 3) {
             const results = recentGames.map((g) => {
               const scores = g.scores as { home: number; away: number } | null;
               if (!scores) return { won: false };
