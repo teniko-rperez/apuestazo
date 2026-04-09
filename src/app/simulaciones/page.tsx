@@ -108,7 +108,10 @@ function BetRow({ bet }: { bet: SimBet }) {
             )}
           </div>
           <p className="text-[11px] text-gray-400 truncate">
-            {bet.events ? `${bet.events.away_team} vs ${bet.events.home_team}` : ""}
+            {bet.events ? `${bet.events.away_team}` : ""}
+            {bet.events?.scores && <span className="font-bold text-gray-700 mx-0.5">{bet.events.scores.away}</span>}
+            {bet.events ? ` vs ${bet.events.home_team}` : ""}
+            {bet.events?.scores && <span className="font-bold text-gray-700 mx-0.5">{bet.events.scores.home}</span>}
             {bet.events && <span className="text-[9px] text-blue-500 font-bold ml-1">({bet.events.home_team} HOME)</span>}
           </p>
           <p className="text-[12px] text-gray-800 truncate">
@@ -126,9 +129,6 @@ function BetRow({ bet }: { bet: SimBet }) {
             <p className={`text-[12px] font-bold font-mono ${bet.profit >= 0 ? "text-green-600" : "text-red-500"}`}>
               {bet.profit >= 0 ? "+" : ""}${bet.profit.toFixed(0)}
             </p>
-          )}
-          {bet.events?.scores && (
-            <p className="text-[10px] text-gray-400 font-mono">{bet.events.scores.away}-{bet.events.scores.home}</p>
           )}
           <span className="text-[10px] text-gray-300">{open ? "▲" : "▼"}</span>
         </div>
