@@ -74,7 +74,7 @@ function analyzeLosses(bets: BetData[]): { analysis: LossAnalysis[]; patterns: s
   for (const bet of losses) {
     const signalMatch = bet.reasoning?.match(/\[([^\]]+)\]/);
     const signals = signalMatch ? signalMatch[1].split('+').map((s) => s.trim()) : [];
-    const catMatch = bet.reasoning?.match(/(\d)\/3 categorias, (\d+) senales/);
+    const catMatch = bet.reasoning?.match(/(\d+)\/3 categorias, (\d+) senales/);
     const catCount = catMatch ? parseInt(catMatch[1]) : 1;
     const signalCount = catMatch ? parseInt(catMatch[2]) : signals.length;
 
@@ -158,7 +158,8 @@ export function learnFromHistory(bets: BetData[]): LearnedConfig {
 
   const wins = bets.filter((b) => b.result === 'won');
   const losses = bets.filter((b) => b.result === 'lost');
-  const winRate = wins.length / (wins.length + losses.length);
+  const settled = wins.length + losses.length;
+  const winRate = settled > 0 ? wins.length / settled : 0;
 
   // ─── Deep loss analysis ───
   const { analysis: lossAnalysis, patterns } = analyzeLosses(bets);
@@ -182,22 +183,32 @@ export function learnFromHistory(bets: BetData[]): LearnedConfig {
     const w = signalWins[sig] ?? 0;
     const l = signalLosses[sig] ?? 0;
     const total = w + l;
-    if (total < 2) continue;
+    if (total < 5) continue; // Need at least 5 samples for reliable adjustments
     const sigWR = w / total;
     const original = DEFAULT_WEIGHTS[sig] ?? 0.12;
 
     if (sigWR >= 0.75) {
-      learnedWeights[sig] = Math.min(0.40, original * 1.6);
+      learnedWeights[sig] = Math.min(0.50, original * 1.5);
       adjustments.push(`${sig}: peso SUBIDO a ${(learnedWeights[sig] * 100).toFixed(0)}% (${w}W-${l}L = ${(sigWR * 100).toFixed(0)}% WR)`);
     } else if (sigWR >= 0.55) {
-      learnedWeights[sig] = Math.min(0.35, original * 1.2);
-    } else if (sigWR <= 0.30 && total >= 3) {
+      learnedWeights[sig] = Math.min(0.40, original * 1.2);
+    } else if (sigWR <= 0.30) {
       learnedWeights[sig] = Math.max(0.03, original * 0.3);
       avoidSignals.push(sig);
       adjustments.push(`${sig}: peso REDUCIDO a ${(learnedWeights[sig] * 100).toFixed(0)}% (${w}W-${l}L = ${(sigWR * 100).toFixed(0)}% WR). EVITAR.`);
     } else if (sigWR < 0.45) {
       learnedWeights[sig] = Math.max(0.05, original * 0.6);
       adjustments.push(`${sig}: peso reducido a ${(learnedWeights[sig] * 100).toFixed(0)}% (${w}W-${l}L = ${(sigWR * 100).toFixed(0)}% WR)`);
+    }
+  }
+
+  // Normalize weights so they sum to the same total as defaults
+  const defaultSum = Object.values(DEFAULT_WEIGHTS).reduce((s, v) => s + v, 0);
+  const learnedSum = Object.values(learnedWeights).reduce((s, v) => s + v, 0);
+  if (learnedSum > 0) {
+    const scale = defaultSum / learnedSum;
+    for (const sig of Object.keys(learnedWeights)) {
+      learnedWeights[sig] *= scale;
     }
   }
 
@@ -257,7 +268,7 @@ export function learnFromHistory(bets: BetData[]): LearnedConfig {
   for (const combo of Object.keys({ ...comboWins, ...comboLosses })) {
     const w = comboWins[combo] ?? 0;
     const l = comboLosses[combo] ?? 0;
-    if (w + l < 2) continue;
+    if (w + l < 5) continue; // Need 5+ samples for reliable combo analysis
     if (w / (w + l) >= 0.70) bestCombos.push(combo);
     if (l / (w + l) >= 0.65) worstCombos.push(combo);
   }
@@ -289,13 +300,15 @@ export function shouldCancelBet(
   config: LearnedConfig,
   odds?: number
 ): { cancel: boolean; reason: string } {
-  if (confidence < config.min_confidence) {
-    return { cancel: true, reason: `Confianza ${(confidence * 100).toFixed(0)}% < minimo ${(config.min_confidence * 100).toFixed(0)}%` };
+  const ABS_MIN_CONFIDENCE = 0.10; // Never bet below 10% no matter what
+  const effectiveMinConf = Math.max(ABS_MIN_CONFIDENCE, config.min_confidence);
+  if (confidence < effectiveMinConf) {
+    return { cancel: true, reason: `Confianza ${(confidence * 100).toFixed(0)}% < minimo ${(effectiveMinConf * 100).toFixed(0)}%` };
   }
 
   const signalMatch = reasoning?.match(/\[([^\]]+)\]/);
   const signals = signalMatch ? signalMatch[1].split('+').map((s) => s.trim()) : [];
-  const catMatch = reasoning?.match(/(\d)\/3 categorias, (\d+) senales/);
+  const catMatch = reasoning?.match(/(\d+)\/3 categorias, (\d+) senales/);
   const signalCount = catMatch ? parseInt(catMatch[2]) : signals.length;
   const catCount = catMatch ? parseInt(catMatch[1]) : 1;
 

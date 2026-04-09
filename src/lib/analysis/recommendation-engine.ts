@@ -575,15 +575,14 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
     const combo = [...new Set(c.signals)].sort().join('+');
     if (worstCombos.has(combo)) continue;
 
-    // Weighted average of signal scores, boosted by learned signal weights
-    const sorted = [...c.scores].sort((a, b) => b - a);
+    // Weighted average of signal scores, paired with correct signal names
+    const pairs = c.scores.map((score, i) => ({ score, signal: c.signals[i] }));
+    pairs.sort((a, b) => b.score - a.score);
     let weightedSum = 0;
     let weightTotal = 0;
-    for (let i = 0; i < sorted.length; i++) {
-      const sig = c.signals[i];
-      const learnedW = learnedConfig?.signal_weights[sig] ?? (1 / (i + 1));
-      const w = learnedConfig ? learnedW : 1 / (i + 1);
-      weightedSum += sorted[i] * w;
+    for (let i = 0; i < pairs.length; i++) {
+      const w = learnedConfig?.signal_weights[pairs[i].signal] ?? (1 / (i + 1));
+      weightedSum += pairs[i].score * w;
       weightTotal += w;
     }
     const weightedAvg = weightTotal > 0 ? weightedSum / weightTotal : 0;

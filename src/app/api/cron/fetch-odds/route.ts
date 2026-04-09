@@ -407,18 +407,35 @@ export async function GET(request: Request) {
       .eq('result', 'pending');
 
     let cancelled = 0;
-    if (pendingBets15) {
+    if (pendingBets15 && pendingBets15.length > 0) {
+      // Batch load all needed data to avoid N+1 queries
+      const pendingEventIds = [...new Set(pendingBets15.map((b) => b.event_id as string))];
+      const { data: batchEvents } = await supabase.from('events').select('id, commence_time').in('id', pendingEventIds);
+      const eventTimeMap = new Map((batchEvents ?? []).map((e) => [e.id as string, e.commence_time as string]));
+
+      const { data: batchOdds } = await supabase.from('latest_odds').select('event_id, outcomes').eq('market_key', 'h2h').in('event_id', pendingEventIds);
+      const oddsMap = new Map((batchOdds ?? []).map((o) => [o.event_id as string, (o as Record<string, unknown>).outcomes as Array<{ name: string; price: number }>]));
+
+      const { data: batchRecs } = await supabase.from('recommendations').select('event_id, outcome_name, confidence_score')
+        .eq('market_key', 'h2h').in('event_id', pendingEventIds)
+        .gte('valid_until', new Date().toISOString());
+      const recMap = new Map<string, { outcome_name: string; confidence_score: number }>();
+      for (const rec of (batchRecs ?? []) as Array<Record<string, unknown>>) {
+        const eid = rec.event_id as string;
+        const conf = rec.confidence_score as number;
+        if (!recMap.has(eid) || conf > (recMap.get(eid)?.confidence_score ?? 0)) {
+          recMap.set(eid, { outcome_name: rec.outcome_name as string, confidence_score: conf });
+        }
+      }
+
       for (const bet of pendingBets15) {
-        const { data: ev } = await supabase.from('events').select('commence_time').eq('id', bet.event_id).single();
-        if (!ev) continue;
-        if (new Date(ev.commence_time as string).getTime() <= Date.now()) continue; // Game started, freeze
+        const commenceTime = eventTimeMap.get(bet.event_id as string);
+        if (!commenceTime) continue;
+        if (new Date(commenceTime).getTime() <= Date.now()) continue; // Game started, freeze
 
         // Check if the favorite changed (odds shifted)
-        const { data: currentOdds } = await supabase.from('latest_odds').select('outcomes')
-          .eq('event_id', bet.event_id).eq('market_key', 'h2h').limit(1);
-
-        if (currentOdds?.[0]) {
-          const outcomes = (currentOdds[0] as Record<string, unknown>).outcomes as Array<{ name: string; price: number }>;
+        const outcomes = oddsMap.get(bet.event_id as string);
+        if (outcomes && outcomes.length >= 2) {
           const currentFav = outcomes.reduce((a, b) => a.price < b.price ? a : b);
 
           // Cancel if favorite flipped to the other team
@@ -434,7 +451,6 @@ export async function GET(request: Request) {
           // Cancel if our pick's odds got much worse (moved from favorite to underdog)
           const ourOutcome = outcomes.find((o) => o.name === bet.outcome_name);
           if (ourOutcome && ourOutcome.price > 0 && (bet.odds as number) < 0) {
-            // Was favorite, now underdog = big shift
             await supabase.from('simulated_bets').update({
               result: 'cancelled', profit: 0, settled_at: new Date().toISOString(),
               reasoning: (bet.reasoning ?? '') + ` [CANCELADA: odds cambiaron de ${bet.odds} a +${ourOutcome.price} (ya no es favorito)]`,
@@ -445,16 +461,11 @@ export async function GET(request: Request) {
         }
 
         // Check recommendation confidence
-        const { data: recs } = await supabase.from('recommendations')
-          .select('outcome_name, confidence_score')
-          .eq('event_id', bet.event_id).eq('market_key', 'h2h')
-          .gte('valid_until', new Date().toISOString())
-          .order('confidence_score', { ascending: false }).limit(1);
-
-        if (recs?.[0] && (recs[0].confidence_score as number) < 0.10) {
+        const rec = recMap.get(bet.event_id as string);
+        if (rec && rec.confidence_score < 0.10) {
           await supabase.from('simulated_bets').update({
             result: 'cancelled', profit: 0, settled_at: new Date().toISOString(),
-            reasoning: (bet.reasoning ?? '') + ` [CANCELADA: confianza bajo a ${((recs[0].confidence_score as number) * 100).toFixed(0)}%]`,
+            reasoning: (bet.reasoning ?? '') + ` [CANCELADA: confianza bajo a ${(rec.confidence_score * 100).toFixed(0)}%]`,
           }).eq('id', bet.id);
           cancelled++;
         }
@@ -498,16 +509,31 @@ export async function GET(request: Request) {
       if (rec.event_id && !recByEvent.has(rec.event_id as string)) recByEvent.set(rec.event_id as string, rec);
     }
 
+    // Batch load events and existing bets to avoid N+1
+    const favEventIds = [...favoritePerEvent.keys()];
+    const { data: batchFavEvents } = await supabase.from('events').select('id, commence_time, completed').in('id', favEventIds);
+    const favEventMap = new Map((batchFavEvents ?? []).map((e) => [e.id as string, e as Record<string, unknown>]));
+
+    const { data: batchExisting } = await supabase.from('simulated_bets').select('id, event_id, result').in('event_id', favEventIds);
+    const existingBetMap = new Map<string, { id: number; result: string }>();
+    for (const b of (batchExisting ?? []) as Array<Record<string, unknown>>) {
+      if (!existingBetMap.has(b.event_id as string)) {
+        existingBetMap.set(b.event_id as string, { id: b.id as number, result: b.result as string });
+      }
+    }
+
+    const lcMaxOdds = learnedConfig?.max_odds ?? 500;
+    const lcMinOdds = learnedConfig?.min_odds ?? -800;
+    const lcMinConf = learnedConfig?.min_confidence ?? 0.12;
+
     let created = 0;
     for (const [eventId, fav] of favoritePerEvent) {
       // Only games not started
-      const { data: eventData } = await supabase.from('events').select('commence_time, completed').eq('id', eventId).single();
+      const eventData = favEventMap.get(eventId);
       if (!eventData || eventData.completed) continue;
       if (new Date(eventData.commence_time as string).getTime() <= Date.now()) continue;
 
       // Skip if odds too extreme (use learned thresholds or defaults)
-      const lcMaxOdds = learnedConfig?.max_odds ?? 500;
-      const lcMinOdds = learnedConfig?.min_odds ?? -800;
       if (fav.odds < lcMinOdds) continue;
       if (fav.odds > 0 && fav.odds > lcMaxOdds) continue;
 
@@ -519,11 +545,10 @@ export async function GET(request: Request) {
       const confidence = rec ? (rec.confidence_score as number) : 0.50;
 
       // Skip if below learned minimum confidence
-      const lcMinConf = learnedConfig?.min_confidence ?? 0.12;
       if (confidence < lcMinConf) continue;
 
-      const { data: ex } = await supabase.from('simulated_bets').select('id, result').eq('event_id', eventId).limit(1);
-      if (!ex || ex.length === 0) {
+      const ex = existingBetMap.get(eventId);
+      if (!ex) {
         await supabase.from('simulated_bets').insert({
           event_id: eventId, market_key: 'h2h',
           outcome_name: fav.team, bookmaker_key: fav.bookmaker,
@@ -531,7 +556,7 @@ export async function GET(request: Request) {
           reasoning, result: 'pending',
         });
         created++;
-      } else if (ex[0].result === 'pending') {
+      } else if (ex.result === 'pending') {
         // Update if better favorite found or recommendation changed
         await supabase.from('simulated_bets').update({
           outcome_name: fav.team, bookmaker_key: fav.bookmaker,
