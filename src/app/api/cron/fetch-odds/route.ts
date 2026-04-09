@@ -380,45 +380,59 @@ export async function GET(request: Request) {
       summary.recommendations = engineRecs.length;
     }
 
-    // ═══ PHASE 3.5: CANCEL BAD BETS (pre-game only) ═══
+    // ═══ PHASE 3.5: MONITOR & CANCEL BETS (pre-game only) ═══
     const { data: pendingBets15 } = await supabase.from('simulated_bets')
-      .select('id, event_id, outcome_name, reasoning')
+      .select('id, event_id, outcome_name, reasoning, odds')
       .eq('result', 'pending');
 
     let cancelled = 0;
     if (pendingBets15) {
       for (const bet of pendingBets15) {
-        // Skip if game already started
         const { data: ev } = await supabase.from('events').select('commence_time').eq('id', bet.event_id).single();
         if (!ev) continue;
-        if (new Date(ev.commence_time as string).getTime() <= Date.now()) continue;
+        if (new Date(ev.commence_time as string).getTime() <= Date.now()) continue; // Game started, freeze
 
-        // Check if this bet still has a valid recommendation
+        // Check if the favorite changed (odds shifted)
+        const { data: currentOdds } = await supabase.from('latest_odds').select('outcomes')
+          .eq('event_id', bet.event_id).eq('market_key', 'h2h').limit(1);
+
+        if (currentOdds?.[0]) {
+          const outcomes = (currentOdds[0] as Record<string, unknown>).outcomes as Array<{ name: string; price: number }>;
+          const currentFav = outcomes.reduce((a, b) => a.price < b.price ? a : b);
+
+          // Cancel if favorite flipped to the other team
+          if (currentFav.name !== bet.outcome_name && currentFav.price < -120) {
+            await supabase.from('simulated_bets').update({
+              result: 'cancelled', profit: 0, settled_at: new Date().toISOString(),
+              reasoning: (bet.reasoning ?? '') + ` [CANCELADA: favorito cambio a ${currentFav.name} (${currentFav.price})]`,
+            }).eq('id', bet.id);
+            cancelled++;
+            continue;
+          }
+
+          // Cancel if our pick's odds got much worse (moved from favorite to underdog)
+          const ourOutcome = outcomes.find((o) => o.name === bet.outcome_name);
+          if (ourOutcome && ourOutcome.price > 0 && (bet.odds as number) < 0) {
+            // Was favorite, now underdog = big shift
+            await supabase.from('simulated_bets').update({
+              result: 'cancelled', profit: 0, settled_at: new Date().toISOString(),
+              reasoning: (bet.reasoning ?? '') + ` [CANCELADA: odds cambiaron de ${bet.odds} a +${ourOutcome.price} (ya no es favorito)]`,
+            }).eq('id', bet.id);
+            cancelled++;
+            continue;
+          }
+        }
+
+        // Check recommendation confidence
         const { data: recs } = await supabase.from('recommendations')
           .select('outcome_name, confidence_score')
-          .eq('event_id', bet.event_id)
-          .eq('market_key', 'h2h')
+          .eq('event_id', bet.event_id).eq('market_key', 'h2h')
           .gte('valid_until', new Date().toISOString())
-          .order('confidence_score', { ascending: false })
-          .limit(1);
+          .order('confidence_score', { ascending: false }).limit(1);
 
-        // Cancel if: no recommendation, or recommendation changed to different team, or confidence dropped below 0.15
-        if (!recs || recs.length === 0) {
+        if (recs?.[0] && (recs[0].confidence_score as number) < 0.10) {
           await supabase.from('simulated_bets').update({
-            result: 'push', profit: 0, settled_at: new Date().toISOString(),
-            reasoning: (bet.reasoning ?? '') + ' [CANCELADA: senales ya no soportan esta apuesta]',
-          }).eq('id', bet.id);
-          cancelled++;
-        } else if (recs[0].outcome_name !== bet.outcome_name) {
-          // Engine now recommends the OTHER team - cancel
-          await supabase.from('simulated_bets').update({
-            result: 'push', profit: 0, settled_at: new Date().toISOString(),
-            reasoning: (bet.reasoning ?? '') + ` [CANCELADA: engine ahora recomienda ${recs[0].outcome_name}]`,
-          }).eq('id', bet.id);
-          cancelled++;
-        } else if ((recs[0].confidence_score as number) < 0.15) {
-          await supabase.from('simulated_bets').update({
-            result: 'push', profit: 0, settled_at: new Date().toISOString(),
+            result: 'cancelled', profit: 0, settled_at: new Date().toISOString(),
             reasoning: (bet.reasoning ?? '') + ` [CANCELADA: confianza bajo a ${((recs[0].confidence_score as number) * 100).toFixed(0)}%]`,
           }).eq('id', bet.id);
           cancelled++;
@@ -427,56 +441,77 @@ export async function GET(request: Request) {
     }
     summary.betsCancelled = cancelled;
 
-    // ═══ PHASE 4: SIMULATED BETS (1 per game, moneyline only) ═══
+    // ═══ PHASE 4: SIMULATED BETS (always bet on favorite, 1 per game) ═══
+    // Get all h2h odds to find the favorite per event
+    const { data: latestH2h } = await supabase.from('latest_odds').select('*').eq('market_key', 'h2h');
+    const favoritePerEvent = new Map<string, { team: string; odds: number; bookmaker: string }>();
+
+    for (const row of latestH2h ?? []) {
+      const outcomes = (row as Record<string, unknown>).outcomes as Array<{ name: string; price: number }>;
+      const eventId = (row as Record<string, unknown>).event_id as string;
+      if (!outcomes || outcomes.length < 2) continue;
+
+      // Favorite = lowest (most negative) American odds
+      const sorted = [...outcomes].sort((a, b) => a.price - b.price);
+      const fav = sorted[0]; // most negative = biggest favorite
+      if (fav.price >= 0) continue; // skip if no clear favorite
+
+      const existing = favoritePerEvent.get(eventId);
+      if (!existing || fav.price < existing.odds) {
+        favoritePerEvent.set(eventId, {
+          team: fav.name,
+          odds: fav.price,
+          bookmaker: (row as Record<string, unknown>).bookmaker_key as string,
+        });
+      }
+    }
+
+    // Get recommendations for reasoning/confidence
     const { data: allRecs } = await supabase.from('recommendations').select('*')
-      .eq('market_key', 'h2h') // Only moneyline (who wins)
-      .neq('odds', 0) // Must have valid odds
+      .eq('market_key', 'h2h').neq('odds', 0)
       .gte('valid_until', new Date().toISOString())
       .order('confidence_score', { ascending: false });
-    if (allRecs && allRecs.length > 0) {
-      // Best moneyline rec per event (1 bet per game)
-      const bestPerEvent = new Map<string, typeof allRecs[0]>();
-      for (const rec of allRecs) {
-        if (rec.event_id && !bestPerEvent.has(rec.event_id)) {
-          bestPerEvent.set(rec.event_id, rec);
-        }
-      }
-      let created = 0;
-      for (const [eventId, rec] of bestPerEvent) {
-        // Only create/update bets for games that haven't started yet
-        const { data: eventData } = await supabase.from('events').select('commence_time, completed').eq('id', eventId).single();
-        if (!eventData || eventData.completed) continue;
-        const gameStart = new Date(eventData.commence_time as string).getTime();
-        if (Date.now() > gameStart) continue;
 
-        // Skip extreme odds (learned from losses)
-        const odds = rec.odds as number;
-        if (odds > 0 && odds > 300) continue; // Skip big underdogs
-        if (odds < 0 && odds < -500) continue; // Skip extreme favorites (low payout)
-        if (odds === 0) continue;
-
-        // Skip low confidence
-        if ((rec.confidence_score as number) < 0.20) continue;
-
-        const { data: ex } = await supabase.from('simulated_bets').select('id').eq('event_id', eventId).limit(1);
-        if (!ex || ex.length === 0) {
-          await supabase.from('simulated_bets').insert({
-            event_id: rec.event_id, market_key: 'h2h',
-            outcome_name: rec.outcome_name, bookmaker_key: rec.bookmaker_key,
-            odds: rec.odds, stake: 50, source: rec.type,
-            reasoning: rec.reasoning, result: 'pending',
-          });
-          created++;
-        } else {
-          // Update existing bet if game hasn't started (better recommendation found)
-          await supabase.from('simulated_bets').update({
-            outcome_name: rec.outcome_name, bookmaker_key: rec.bookmaker_key,
-            odds: rec.odds, source: rec.type, reasoning: rec.reasoning,
-          }).eq('event_id', eventId).eq('result', 'pending');
-        }
-      }
-      summary.betsCreated = created;
+    const recByEvent = new Map<string, Record<string, unknown>>();
+    for (const rec of (allRecs ?? []) as Array<Record<string, unknown>>) {
+      if (rec.event_id && !recByEvent.has(rec.event_id as string)) recByEvent.set(rec.event_id as string, rec);
     }
+
+    let created = 0;
+    for (const [eventId, fav] of favoritePerEvent) {
+      // Only games not started
+      const { data: eventData } = await supabase.from('events').select('commence_time, completed').eq('id', eventId).single();
+      if (!eventData || eventData.completed) continue;
+      if (new Date(eventData.commence_time as string).getTime() <= Date.now()) continue;
+
+      // Skip if odds too extreme
+      if (fav.odds < -800) continue;
+
+      // Build reasoning from recommendation if available
+      const rec = recByEvent.get(eventId);
+      const reasoning = rec
+        ? (rec.reasoning as string)
+        : `Favorito del mercado con odds ${fav.odds}. Apuesta basada en linea de apertura.`;
+      const confidence = rec ? (rec.confidence_score as number) : 0.50;
+
+      const { data: ex } = await supabase.from('simulated_bets').select('id, result').eq('event_id', eventId).limit(1);
+      if (!ex || ex.length === 0) {
+        await supabase.from('simulated_bets').insert({
+          event_id: eventId, market_key: 'h2h',
+          outcome_name: fav.team, bookmaker_key: fav.bookmaker,
+          odds: fav.odds, stake: 50, source: 'favorite',
+          reasoning, result: 'pending',
+        });
+        created++;
+      } else if (ex[0].result === 'pending') {
+        // Update if better favorite found or recommendation changed
+        await supabase.from('simulated_bets').update({
+          outcome_name: fav.team, bookmaker_key: fav.bookmaker,
+          odds: fav.odds, source: 'favorite', reasoning,
+        }).eq('event_id', eventId).eq('result', 'pending');
+      }
+    }
+    summary.betsCreated = created;
 
     // Settle bets
     const { data: pending } = await supabase.from('simulated_bets').select('*, events(completed, scores, home_team, away_team)').eq('result', 'pending');

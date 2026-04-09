@@ -18,7 +18,7 @@ interface SimBet {
   stake: number;
   source: string;
   reasoning: string;
-  result: "pending" | "won" | "lost" | "push";
+  result: "pending" | "won" | "lost" | "push" | "cancelled";
   profit: number | null;
   placed_at: string;
   events?: {
@@ -46,10 +46,12 @@ function useSimBets() {
 function calcStats(bets: SimBet[]) {
   const won = bets.filter((b) => b.result === "won").length;
   const lost = bets.filter((b) => b.result === "lost").length;
+  const cancelledCount = bets.filter((b) => b.result === "cancelled" || (b.result === "push" && b.reasoning?.includes("CANCELADA"))).length;
+  const pending = bets.filter((b) => b.result === "pending").length;
   const settled = won + lost;
   const profit = bets.reduce((s, b) => s + (b.profit ?? 0), 0);
   const winRate = settled > 0 ? ((won / settled) * 100).toFixed(0) : "0";
-  return { total: bets.length, won, lost, settled, profit, winRate };
+  return { total: bets.length, won, lost, cancelled: cancelledCount, pending, settled, profit, winRate };
 }
 
 function cleanReasoning(r?: string): string {
@@ -64,8 +66,8 @@ function cleanReasoning(r?: string): string {
 
 function BetRow({ bet }: { bet: SimBet }) {
   const [open, setOpen] = useState(false);
-  const isCancelled = bet.reasoning?.includes('[CANCELADA');
-  const cancelReason = bet.reasoning?.match(/\[CANCELADA: ([^\]]+)\]/)?.[1] ?? '';
+  const isCancelled = bet.result === "cancelled" || bet.reasoning?.includes('[CANCELADA');
+  const cancelReason = bet.reasoning?.match(/\[CANCELADA[^:]*: ([^\]]+)\]/)?.[1] ?? '';
   const rColor = isCancelled ? "text-gray-500" : bet.result === "won" ? "text-green-600" : bet.result === "lost" ? "text-red-500" : "text-blue-600";
   const rBg = isCancelled ? "bg-gray-100" : bet.result === "won" ? "bg-green-50" : bet.result === "lost" ? "bg-red-50" : "bg-blue-50";
   const borderColor = isCancelled ? "border-l-gray-400" : bet.result === "won" ? "border-l-green-500" : bet.result === "lost" ? "border-l-red-500" : "border-l-blue-400";
@@ -172,7 +174,7 @@ function BetRow({ bet }: { bet: SimBet }) {
 
 function StatsBar({ stats }: { stats: ReturnType<typeof calcStats> }) {
   return (
-    <div className="grid grid-cols-4 gap-1.5 mb-4">
+    <div className="grid grid-cols-5 gap-1.5 mb-4">
       <div className="bg-white rounded-xl py-2 text-center shadow-sm border border-border/50">
         <p className="text-[14px] font-bold font-mono text-gray-800">{stats.total}</p>
         <p className="text-[9px] text-gray-400 font-semibold">TOTAL</p>
@@ -182,8 +184,12 @@ function StatsBar({ stats }: { stats: ReturnType<typeof calcStats> }) {
         <p className="text-[9px] text-gray-400 font-semibold">GANADAS</p>
       </div>
       <div className="bg-white rounded-xl py-2 text-center shadow-sm border border-border/50">
+        <p className="text-[14px] font-bold font-mono text-gray-500">{stats.cancelled}</p>
+        <p className="text-[9px] text-gray-400 font-semibold">CANCEL</p>
+      </div>
+      <div className="bg-white rounded-xl py-2 text-center shadow-sm border border-border/50">
         <p className="text-[14px] font-bold font-mono text-gray-800">{stats.winRate}%</p>
-        <p className="text-[9px] text-gray-400 font-semibold">WIN RATE</p>
+        <p className="text-[9px] text-gray-400 font-semibold">WIN %</p>
       </div>
       <div className="bg-white rounded-xl py-2 text-center shadow-sm border border-border/50">
         <p className={`text-[14px] font-bold font-mono ${stats.profit >= 0 ? "text-green-600" : "text-red-500"}`}>
