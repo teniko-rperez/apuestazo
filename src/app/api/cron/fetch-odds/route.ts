@@ -260,7 +260,24 @@ export async function GET(request: Request) {
     }
 
     await supabase.rpc('expire_old_opportunities');
-    summary.source = 'Correlation Engine: ESPN + Twitter + Reddit + Covers + Line Movement + Consensus';
+    // Send push notification if we have new high-confidence recommendations
+    const { data: topRec } = await supabase.from('recommendations').select('*').gte('valid_until', new Date().toISOString()).order('confidence_score', { ascending: false }).limit(1);
+    if (topRec?.[0] && (topRec[0].confidence_score as number) > 0.5) {
+      try {
+        const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://apuestazo.vercel.app';
+        await fetch(`${baseUrl}/api/push/send`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${process.env.CRON_SECRET}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `Apuestazo: ${summary.recommendations ?? 0} recomendaciones`,
+            body: `${topRec[0].outcome_name} - ${(topRec[0].confidence_score as number * 100).toFixed(0)}% confianza`,
+            url: '/simulaciones',
+          }),
+        });
+      } catch { /* ok */ }
+    }
+
+    summary.source = 'Correlation Engine (11 signals): ESPN + Odds API + Kalshi + Polymarket + Reddit + Covers + Weather + Stats';
 
     return NextResponse.json({ success: true, summary });
   } catch (error) {

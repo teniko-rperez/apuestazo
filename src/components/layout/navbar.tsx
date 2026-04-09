@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { PushToggle } from "./push-toggle";
 
 const TABS = [
   { href: "/", label: "Inicio", icon: "🏠" },
@@ -13,6 +14,7 @@ const TABS = [
   { href: "/valor", label: "Valor +EV", icon: "📈" },
   { href: "/simulaciones", label: "Simulaciones", icon: "🎯" },
   { href: "/expertos", label: "Expertos", icon: "👥" },
+  { href: "/engine", label: "Engine", icon: "⚙️" },
 ];
 
 export function Navbar() {
@@ -40,7 +42,9 @@ export function Navbar() {
           <span className="text-blue-600">Apuesta</span>
           <span className="text-orange-500">zo</span>
         </h1>
-        <button
+        <div className="flex items-center gap-2">
+          <PushToggle />
+          <button
           onClick={handleRefresh}
           disabled={refreshing}
           className={cn(
@@ -51,7 +55,8 @@ export function Navbar() {
           )}
         >
           {refreshing ? "..." : "Actualizar"}
-        </button>
+          </button>
+        </div>
       </header>
 
       {/* ═══ MOBILE: Bottom tab bar ═══ */}
