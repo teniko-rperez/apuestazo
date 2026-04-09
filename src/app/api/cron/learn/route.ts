@@ -56,7 +56,7 @@ export async function GET(request: Request) {
       DISCREPANCY: 0.08, CONTRARIAN: 0.06, ROBINHOOD: 0.10, POLYMARKET: 0.08,
       STATS: 0.10, WEATHER: 0.06, ALTITUDE: 0.08, PACE: 0.10, FATIGUE: 0.08,
       REST: 0.06, HOME: 0.05, CLV: 0.10, STREAK: 0.06, REGRESSION: 0.06,
-      PLAYOFF: 0.08, TANK: 0.06,
+      PLAYOFF: 0.08, TANK: 0.06, INJURY: 0.20,
     };
     for (const [signal, newW] of Object.entries(config.signal_weights)) {
       const oldW = DEFAULT_W[signal] ?? 0.12;

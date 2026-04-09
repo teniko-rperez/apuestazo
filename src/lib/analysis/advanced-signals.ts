@@ -298,3 +298,99 @@ export function computePlayoffMotivation(
 
   return { event_id: eventId, team_name: teamName, motivation, description: desc };
 }
+
+// ─── Signal 21: Injuries (Star Players) ───
+export interface InjurySignal {
+  event_id: string;
+  team_name: string;
+  opponent_name: string;
+  team_impact: 'critical' | 'significant' | 'minor' | 'none';
+  opponent_impact: 'critical' | 'significant' | 'minor' | 'none';
+  advantage: 'strong_for_team' | 'for_team' | 'for_opponent' | 'strong_for_opponent' | 'neutral';
+  score: number; // 0-1 how confident this signal is
+  description: string;
+}
+
+export function computeInjuryAdvantage(
+  eventId: string,
+  homeTeam: string,
+  awayTeam: string,
+  injuryReports: Map<string, { impact: string; star_out_count: number; total_out_count: number; description: string }>,
+): InjurySignal[] {
+  const homeReport = injuryReports.get(homeTeam);
+  const awayReport = injuryReports.get(awayTeam);
+
+  const homeImpact = (homeReport?.impact ?? 'none') as InjurySignal['team_impact'];
+  const awayImpact = (awayReport?.impact ?? 'none') as InjurySignal['team_impact'];
+  const homeStars = homeReport?.star_out_count ?? 0;
+  const awayStars = awayReport?.star_out_count ?? 0;
+
+  const impactScore = (impact: string): number => {
+    if (impact === 'critical') return 3;
+    if (impact === 'significant') return 2;
+    if (impact === 'minor') return 1;
+    return 0;
+  };
+
+  const homePenalty = impactScore(homeImpact);
+  const awayPenalty = impactScore(awayImpact);
+  const diff = awayPenalty - homePenalty; // positive = away team more hurt = good for home
+
+  const signals: InjurySignal[] = [];
+
+  // Only generate signal if there's meaningful injury difference
+  if (Math.abs(diff) >= 1 || homeStars > 0 || awayStars > 0) {
+    let advantage: InjurySignal['advantage'] = 'neutral';
+    let score = 0;
+
+    if (diff >= 2) {
+      advantage = 'strong_for_team'; // away team way more hurt
+      score = Math.min(0.65, 0.30 + awayStars * 0.12);
+    } else if (diff >= 1) {
+      advantage = 'for_team';
+      score = Math.min(0.50, 0.20 + awayStars * 0.10);
+    } else if (diff <= -2) {
+      advantage = 'strong_for_opponent';
+      score = Math.min(0.65, 0.30 + homeStars * 0.12);
+    } else if (diff <= -1) {
+      advantage = 'for_opponent';
+      score = Math.min(0.50, 0.20 + homeStars * 0.10);
+    }
+
+    // Home team perspective
+    const homeDesc = homeReport?.description ?? `${homeTeam}: sin lesiones.`;
+    const awayDesc = awayReport?.description ?? `${awayTeam}: sin lesiones.`;
+
+    signals.push({
+      event_id: eventId,
+      team_name: homeTeam,
+      opponent_name: awayTeam,
+      team_impact: homeImpact,
+      opponent_impact: awayImpact,
+      advantage,
+      score,
+      description: `${homeDesc} ${awayDesc}`,
+    });
+
+    // Away team perspective (inverted)
+    const invertedAdv: Record<string, InjurySignal['advantage']> = {
+      strong_for_team: 'strong_for_opponent',
+      for_team: 'for_opponent',
+      for_opponent: 'for_team',
+      strong_for_opponent: 'strong_for_team',
+      neutral: 'neutral',
+    };
+    signals.push({
+      event_id: eventId,
+      team_name: awayTeam,
+      opponent_name: homeTeam,
+      team_impact: awayImpact,
+      opponent_impact: homeImpact,
+      advantage: invertedAdv[advantage],
+      score,
+      description: `${awayDesc} ${homeDesc}`,
+    });
+  }
+
+  return signals;
+}

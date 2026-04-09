@@ -24,7 +24,7 @@ import type { KalshiContract } from '@/lib/scrapers/kalshi';
 import type { NbaTeamStats, MlbTeamStats } from '@/lib/scrapers/stats';
 import type { WeatherData } from '@/lib/scrapers/weather';
 import type { PolyContract } from '@/lib/scrapers/polymarket';
-import type { FatigueSignal, HomeAwaySignal, PaceSignal, AltitudeSignal, CLVSignal, StreakSignal, PlayoffSignal } from './advanced-signals';
+import type { FatigueSignal, HomeAwaySignal, PaceSignal, AltitudeSignal, CLVSignal, StreakSignal, PlayoffSignal, InjurySignal } from './advanced-signals';
 
 export interface EngineInput {
   arbs: ArbResult[];
@@ -63,6 +63,7 @@ export interface EngineInput {
   clv: CLVSignal[];
   streaks: StreakSignal[];
   playoff: PlayoffSignal[];
+  injuries: InjurySignal[];
   eventTeams: Map<string, { home_team: string; away_team: string }>;
 }
 
@@ -535,13 +536,37 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
     }
   }
 
+  // ─── Signal 21: INJURY (Star Players Out) ───
+  for (const inj of input.injuries) {
+    if (inj.advantage === 'neutral') continue;
+
+    // If opponent is hurt, bet ON this team
+    if (inj.advantage === 'strong_for_team' || inj.advantage === 'for_team') {
+      addSignal(inj.event_id, 'h2h', inj.team_name, 'draftkings', 0,
+        'INJURY', inj.score,
+        `Ventaja por lesiones: ${inj.description}`
+      );
+    }
+    // If this team is hurt, bet on the opponent
+    if (inj.advantage === 'strong_for_opponent' || inj.advantage === 'for_opponent') {
+      const teams = input.eventTeams.get(inj.event_id);
+      if (teams) {
+        const opponent = inj.team_name === teams.home_team ? teams.away_team : teams.home_team;
+        addSignal(inj.event_id, 'h2h', opponent, 'draftkings', 0,
+          'INJURY', inj.score,
+          `Oponente ${inj.team_name} con lesiones clave: ${inj.description}`
+        );
+      }
+    }
+  }
+
   // ─── Score & Rank All Candidates (Optimized) ───
   const results: ScoredRecommendation[] = [];
   const now = Date.now();
 
   // Categorize signal types for weighting
   const MARKET_SIGNALS = new Set(['FAVORITO', 'ARB', 'DISCREPANCY', 'CLV', 'STEAM', 'LINE_MOVE']);
-  const DATA_SIGNALS = new Set(['STATS', 'PACE', 'ALTITUDE', 'WEATHER', 'FATIGUE', 'REST', 'HOME', 'STREAK', 'REGRESSION', 'PLAYOFF', 'TANK']);
+  const DATA_SIGNALS = new Set(['STATS', 'PACE', 'ALTITUDE', 'WEATHER', 'FATIGUE', 'REST', 'HOME', 'STREAK', 'REGRESSION', 'PLAYOFF', 'TANK', 'INJURY']);
   const CROWD_SIGNALS = new Set(['EXPERT', 'ROBINHOOD', 'POLYMARKET', 'CONTRARIAN']);
 
   // Apply learned thresholds if available

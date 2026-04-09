@@ -44,7 +44,7 @@ const DEFAULT_WEIGHTS: Record<string, number> = {
   WEATHER: 0.06, ALTITUDE: 0.08, PACE: 0.10,
   FATIGUE: 0.08, REST: 0.06, HOME: 0.05,
   CLV: 0.10, STREAK: 0.06, REGRESSION: 0.06,
-  PLAYOFF: 0.08, TANK: 0.06,
+  PLAYOFF: 0.08, TANK: 0.06, INJURY: 0.20,
 };
 
 interface BetData {

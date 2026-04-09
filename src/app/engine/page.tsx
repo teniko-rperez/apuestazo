@@ -26,7 +26,7 @@ const SIGNALS: SignalDef[] = [
   { id: 9, key: "STATS", name: "Team Stats", source: "balldontlie + MLB Stats", description: "Win%, puntos promedio, racha reciente. Metodo Log5 para probabilidad.", rawWeight: 0.16, apiKey: true, status: "active" },
   { id: 10, key: "WEATHER", name: "Weather", source: "Open-Meteo", description: "Viento, lluvia, temperatura para juegos MLB outdoor.", rawWeight: 0.12, apiKey: false, status: "active" },
   { id: 11, key: "POLYMARKET", name: "Polymarket", source: "Polymarket CLOB API", description: "Mercado de predicciones crypto con traders sofisticados.", rawWeight: 0.14, apiKey: false, status: "active" },
-  { id: 12, key: "INJURY", name: "Injuries", source: "ESPN injuries API", description: "Jugadores lesionados, cuestionables o fuera. Star out = 3-5pts swing.", rawWeight: 0.15, apiKey: false, status: "beta" },
+  { id: 12, key: "INJURY", name: "Lesiones Estrellas", source: "ESPN injuries API", description: "Detecta jugadores estrella OUT, DOUBTFUL o QUESTIONABLE. Si estrellas del rival estan fuera, es ventaja masiva. Peso alto por impacto directo.", rawWeight: 0.20, apiKey: false, status: "active" },
   { id: 13, key: "FATIGUE", name: "Fatiga / B2B", source: "ESPN schedule", description: "Back-to-back (<28h descanso) = 3-5% menos rendimiento.", rawWeight: 0.14, apiKey: false, status: "active" },
   { id: 14, key: "HOME", name: "Home/Away", source: "Historico", description: "NBA 58% home win, MLB 54%. Ventaja de cancha aplicada.", rawWeight: 0.08, apiKey: false, status: "active" },
   { id: 15, key: "PACE", name: "Pace of Play", source: "NBA stats", description: "Ritmo de juego. Fast pace = OVER, slow = UNDER.", rawWeight: 0.16, apiKey: false, status: "active" },

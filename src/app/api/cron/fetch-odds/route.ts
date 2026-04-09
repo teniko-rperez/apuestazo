@@ -11,7 +11,8 @@ import { generateRecommendations, type EngineInput } from '@/lib/analysis/recomm
 import type { LatestOdds, OddsSnapshot } from '@/types/odds';
 import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
 import { fetchNbaTeamStats, fetchMlbTeamStats } from '@/lib/scrapers/stats';
-import { detectFatigue, computeHomeAdvantage, computePace, computeAltitude, computeCLV, detectStreak, computePlayoffMotivation, type FatigueSignal, type HomeAwaySignal, type PaceSignal, type AltitudeSignal, type CLVSignal, type StreakSignal, type PlayoffSignal } from '@/lib/analysis/advanced-signals';
+import { detectFatigue, computeHomeAdvantage, computePace, computeAltitude, computeCLV, detectStreak, computePlayoffMotivation, computeInjuryAdvantage, type FatigueSignal, type HomeAwaySignal, type PaceSignal, type AltitudeSignal, type CLVSignal, type StreakSignal, type PlayoffSignal, type InjurySignal } from '@/lib/analysis/advanced-signals';
+import { fetchAllInjuries } from '@/lib/scrapers/injuries';
 import type { LearnedConfig } from '@/lib/analysis/learning-engine';
 // Learning runs daily via /api/cron/learn
 import { fetchGameWeather } from '@/lib/scrapers/weather';
@@ -288,6 +289,19 @@ export async function GET(request: Request) {
       const clvSignals: CLVSignal[] = [];
       const streakSignals: StreakSignal[] = [];
       const playoffSignals: PlayoffSignal[] = [];
+      const injurySignals: InjurySignal[] = [];
+
+      // Fetch injury reports
+      const allInjuryReports = await fetchAllInjuries();
+      const injuryMap = new Map<string, { impact: string; star_out_count: number; total_out_count: number; description: string }>();
+      for (const report of allInjuryReports) {
+        injuryMap.set(report.team_name, {
+          impact: report.impact,
+          star_out_count: report.star_out_count,
+          total_out_count: report.total_out_count,
+          description: report.description,
+        });
+      }
 
       // Batch fetch all events with sport_key for advanced signals
       const { data: allEventsForSignals } = await supabase.from('events').select('id, commence_time, sport_key, home_team, away_team, completed, scores').limit(200);
@@ -301,6 +315,9 @@ export async function GET(request: Request) {
 
         // Home/Away
         homeAwaySignals.push(...computeHomeAdvantage(eventId, teams.home_team, teams.away_team, ev.sport_key));
+
+        // Injuries
+        injurySignals.push(...computeInjuryAdvantage(eventId, teams.home_team, teams.away_team, injuryMap));
 
         // Pace (NBA only)
         if (ev.sport_key === 'basketball_nba') {
@@ -373,6 +390,7 @@ export async function GET(request: Request) {
         clv: clvSignals.length,
         streaks: streakSignals.filter((s) => s.streak_type !== 'neutral').length,
         playoff: playoffSignals.filter((p) => p.motivation !== 'medium').length,
+        injuries: injurySignals.filter((i) => i.advantage !== 'neutral').length,
       };
 
       // ═══ PHASE 3: CORRELATION ENGINE (with learned config) ═══
@@ -385,7 +403,7 @@ export async function GET(request: Request) {
         };
       }
 
-      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, fatigue: fatigueSignals, homeAway: homeAwaySignals, pace: paceSignals, altitude: altitudeSignals, clv: clvSignals, streaks: streakSignals, playoff: playoffSignals, eventTeams } as EngineInput, learnedConfig);
+      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, fatigue: fatigueSignals, homeAway: homeAwaySignals, pace: paceSignals, altitude: altitudeSignals, clv: clvSignals, streaks: streakSignals, playoff: playoffSignals, injuries: injurySignals, eventTeams } as EngineInput, learnedConfig);
       summary.engineSignals = { arbs: arbs.length, evs: evs.length, experts: typedExperts.length, lineMovements: lineMovements.length, steamMoves: steamMoves.length, consensus: allConsensus.length, discrepancies: discrepancies.length, parlays: parlays.length, robinhood: kalshiContracts.length };
 
       if (engineRecs.length > 0) {
