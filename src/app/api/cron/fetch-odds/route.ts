@@ -11,6 +11,7 @@ import { generateRecommendations, type EngineInput } from '@/lib/analysis/recomm
 import type { LatestOdds, OddsSnapshot } from '@/types/odds';
 import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
 import { fetchNbaTeamStats, fetchMlbTeamStats } from '@/lib/scrapers/stats';
+import { detectFatigue, computeHomeAdvantage, computePace, computeAltitude, computeCLV, detectStreak, computePlayoffMotivation, type FatigueSignal, type HomeAwaySignal, type PaceSignal, type AltitudeSignal, type CLVSignal, type StreakSignal, type PlayoffSignal } from '@/lib/analysis/advanced-signals';
 import { fetchGameWeather } from '@/lib/scrapers/weather';
 import { fetchPolymarketSports } from '@/lib/scrapers/polymarket';
 import type { WeatherData } from '@/lib/scrapers/weather';
@@ -197,8 +198,96 @@ export async function GET(request: Request) {
         summary.polymarket = polyContracts.length;
       } catch { /* ok */ }
 
-      // ═══ PHASE 3: CORRELATION ENGINE (11 signals) ═══
-      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, eventTeams } as EngineInput);
+      // Compute advanced signals (13-20)
+      const fatigueSignals: FatigueSignal[] = [];
+      const homeAwaySignals: HomeAwaySignal[] = [];
+      const paceSignals: PaceSignal[] = [];
+      const altitudeSignals: AltitudeSignal[] = [];
+      const clvSignals: CLVSignal[] = [];
+      const streakSignals: StreakSignal[] = [];
+      const playoffSignals: PlayoffSignal[] = [];
+
+      for (const [eventId, teams] of eventTeams) {
+        const { data: ev } = await supabase.from('events').select('commence_time, sport_key').eq('id', eventId).single();
+        if (!ev) continue;
+
+        // Home/Away
+        homeAwaySignals.push(...computeHomeAdvantage(eventId, teams.home_team, teams.away_team, ev.sport_key));
+
+        // Pace (NBA only)
+        if (ev.sport_key === 'basketball_nba') {
+          const pace = computePace(eventId, teams.home_team, teams.away_team);
+          if (pace) paceSignals.push(pace);
+        }
+
+        // Altitude (MLB only)
+        if (ev.sport_key === 'baseball_mlb') {
+          altitudeSignals.push(computeAltitude(eventId, teams.home_team));
+        }
+
+        // Fatigue - check recent games for each team
+        for (const teamName of [teams.home_team, teams.away_team]) {
+          const { data: teamGames } = await supabase.from('events').select('commence_time, completed')
+            .or(`home_team.eq.${teamName},away_team.eq.${teamName}`)
+            .order('commence_time', { ascending: false }).limit(5);
+          if (teamGames) {
+            fatigueSignals.push(detectFatigue(eventId, teamName, teamGames, ev.commence_time));
+          }
+        }
+
+        // Streaks
+        for (const teamName of [teams.home_team, teams.away_team]) {
+          const { data: recentGames } = await supabase.from('events').select('home_team, scores, completed')
+            .or(`home_team.eq.${teamName},away_team.eq.${teamName}`)
+            .eq('completed', true)
+            .order('commence_time', { ascending: false }).limit(10);
+          if (recentGames && recentGames.length >= 3) {
+            const results = recentGames.map((g) => {
+              const scores = g.scores as { home: number; away: number } | null;
+              if (!scores) return { won: false };
+              const isHome = g.home_team === teamName;
+              return { won: isHome ? scores.home > scores.away : scores.away > scores.home };
+            });
+            streakSignals.push(detectStreak(eventId, teamName, results));
+          }
+        }
+
+        // Playoff motivation
+        for (const teamName of [teams.home_team, teams.away_team]) {
+          const stats = teamStats.get(teamName);
+          if (stats) {
+            playoffSignals.push(computePlayoffMotivation(eventId, teamName, stats.win_pct, 10, stats.win_pct > 0.5));
+          }
+        }
+
+        // CLV - check line movement for this event
+        const { data: eventSnaps } = await supabase.from('odds_snapshots').select('outcomes, fetched_at, market_key')
+          .eq('event_id', eventId).eq('market_key', 'h2h').order('fetched_at', { ascending: true }).limit(10);
+        if (eventSnaps && eventSnaps.length >= 2) {
+          for (const teamName of [teams.home_team, teams.away_team]) {
+            const teamOdds = eventSnaps.map((s) => {
+              const outcomes = s.outcomes as Array<{ name: string; price: number }>;
+              const o = outcomes.find((x) => x.name === teamName);
+              return o ? { odds: o.price, fetched_at: s.fetched_at as string } : null;
+            }).filter((x): x is { odds: number; fetched_at: string } => x !== null);
+            const clv = computeCLV(eventId, 'h2h', teamName, teamOdds);
+            if (clv) clvSignals.push(clv);
+          }
+        }
+      }
+
+      summary.advancedSignals = {
+        fatigue: fatigueSignals.filter((f) => f.advantage !== 'neutral').length,
+        homeAway: homeAwaySignals.length,
+        pace: paceSignals.length,
+        altitude: altitudeSignals.filter((a) => a.park_factor !== 1.0).length,
+        clv: clvSignals.length,
+        streaks: streakSignals.filter((s) => s.streak_type !== 'neutral').length,
+        playoff: playoffSignals.filter((p) => p.motivation !== 'medium').length,
+      };
+
+      // ═══ PHASE 3: CORRELATION ENGINE (20 signals) ═══
+      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, fatigue: fatigueSignals, homeAway: homeAwaySignals, pace: paceSignals, altitude: altitudeSignals, clv: clvSignals, streaks: streakSignals, playoff: playoffSignals, eventTeams } as EngineInput);
       summary.engineSignals = { arbs: arbs.length, evs: evs.length, experts: typedExperts.length, lineMovements: lineMovements.length, steamMoves: steamMoves.length, consensus: allConsensus.length, discrepancies: discrepancies.length, parlays: parlays.length, robinhood: kalshiContracts.length };
 
       if (engineRecs.length > 0) {

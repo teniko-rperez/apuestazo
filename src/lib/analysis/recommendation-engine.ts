@@ -23,6 +23,7 @@ import type { KalshiContract } from '@/lib/scrapers/kalshi';
 import type { NbaTeamStats, MlbTeamStats } from '@/lib/scrapers/stats';
 import type { WeatherData } from '@/lib/scrapers/weather';
 import type { PolyContract } from '@/lib/scrapers/polymarket';
+import type { FatigueSignal, HomeAwaySignal, PaceSignal, AltitudeSignal, CLVSignal, StreakSignal, PlayoffSignal } from './advanced-signals';
 
 export interface EngineInput {
   arbs: ArbResult[];
@@ -52,8 +53,15 @@ export interface EngineInput {
   parlays: ParlayCombo[];
   kalshiContracts: KalshiContract[];
   teamStats: Map<string, { win_pct: number; avg_points?: number; recent_form?: string }>;
-  weather: Map<string, WeatherData>; // eventId -> weather
+  weather: Map<string, WeatherData>;
   polymarket: PolyContract[];
+  fatigue: FatigueSignal[];
+  homeAway: HomeAwaySignal[];
+  pace: PaceSignal[];
+  altitude: AltitudeSignal[];
+  clv: CLVSignal[];
+  streaks: StreakSignal[];
+  playoff: PlayoffSignal[];
   eventTeams: Map<string, { home_team: string; away_team: string }>;
 }
 
@@ -390,6 +398,113 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
         addSignal(eventId, 'h2h', teams.away_team, 'draftkings', 0,
           'POLYMARKET', score,
           `Polymarket: ${(poly.yes_price * 100).toFixed(0)}% probabilidad`
+        );
+      }
+    }
+  }
+
+  // ─── Signal 13: Back-to-back / Fatigue ───
+  for (const f of input.fatigue) {
+    if (f.advantage === 'fatigued') {
+      // Opponent of fatigued team has advantage
+      const teams = input.eventTeams.get(f.event_id);
+      if (teams) {
+        const opponent = f.team_name === teams.home_team ? teams.away_team : teams.home_team;
+        addSignal(f.event_id, 'h2h', opponent, 'draftkings', 0,
+          'FATIGUE', 0.14,
+          `${f.team_name} en back-to-back. ${f.description}`
+        );
+      }
+    } else if (f.advantage === 'rested') {
+      addSignal(f.event_id, 'h2h', f.team_name, 'draftkings', 0,
+        'REST', 0.10,
+        `${f.team_name} descansado. ${f.description}`
+      );
+    }
+  }
+
+  // ─── Signal 14: Home/Away advantage ───
+  for (const ha of input.homeAway) {
+    if (ha.is_home && ha.home_advantage_pct > 0.55) {
+      addSignal(ha.event_id, 'h2h', ha.team_name, 'draftkings', 0,
+        'HOME', 0.08,
+        ha.description
+      );
+    }
+  }
+
+  // ─── Signal 15: Pace of Play (NBA totals) ───
+  for (const p of input.pace) {
+    if (p.combined_pace === 'fast') {
+      addSignal(p.event_id, 'totals', 'Over', 'draftkings', 0,
+        'PACE', 0.16,
+        p.description
+      );
+    } else if (p.combined_pace === 'slow') {
+      addSignal(p.event_id, 'totals', 'Under', 'draftkings', 0,
+        'PACE', 0.16,
+        p.description
+      );
+    }
+  }
+
+  // ─── Signal 16: Altitude / Park Factor (MLB) ───
+  for (const a of input.altitude) {
+    if (a.park_factor > 1.1) {
+      addSignal(a.event_id, 'totals', 'Over', 'draftkings', 0,
+        'ALTITUDE', a.is_high_altitude ? 0.20 : 0.12,
+        a.description
+      );
+    } else if (a.park_factor < 0.94) {
+      addSignal(a.event_id, 'totals', 'Under', 'draftkings', 0,
+        'ALTITUDE', 0.12,
+        a.description
+      );
+    }
+  }
+
+  // ─── Signal 18: Closing Line Value ───
+  for (const c of input.clv) {
+    if (c.clv < -10) {
+      // Line moved in our favor = sharp agreement
+      addSignal(c.event_id, c.market_key, c.outcome_name, 'draftkings', 0,
+        'CLV', 0.18,
+        c.description
+      );
+    }
+  }
+
+  // ─── Signal 19: Streaks & Regression ───
+  for (const s of input.streaks) {
+    if (s.streak_type === 'cold' && s.regression_likely) {
+      // Cold team due for regression = contrarian value
+      addSignal(s.event_id, 'h2h', s.team_name, 'draftkings', 0,
+        'REGRESSION', 0.12,
+        `Regresion: ${s.description}`
+      );
+    } else if (s.streak_type === 'hot' && !s.regression_likely && s.streak_length >= 4) {
+      addSignal(s.event_id, 'h2h', s.team_name, 'draftkings', 0,
+        'STREAK', 0.10,
+        `Racha: ${s.description}`
+      );
+    }
+  }
+
+  // ─── Signal 20: Playoff Implications ───
+  for (const p of input.playoff) {
+    if (p.motivation === 'high') {
+      addSignal(p.event_id, 'h2h', p.team_name, 'draftkings', 0,
+        'PLAYOFF', 0.14,
+        p.description
+      );
+    } else if (p.motivation === 'low') {
+      // Low motivation team = fade them
+      const teams = input.eventTeams.get(p.event_id);
+      if (teams) {
+        const opponent = p.team_name === teams.home_team ? teams.away_team : teams.home_team;
+        addSignal(p.event_id, 'h2h', opponent, 'draftkings', 0,
+          'TANK', 0.12,
+          `Oponente ${p.team_name} sin motivacion. ${p.description}`
         );
       }
     }

@@ -28,6 +28,14 @@ const SIGNALS: SignalDef[] = [
   { id: 10, name: "Weather", icon: "🌦️", source: "Open-Meteo (gratis)", description: "Para juegos MLB outdoor: viento >15mph y lluvia >40% favorecen Under. Temperatura extrema afecta rendimiento.", weight: "Baja (0.12)", apiKey: false, status: "active" },
   { id: 11, name: "Polymarket", icon: "🔮", source: "Polymarket CLOB API", description: "Mercado de predicciones crypto. Precios reflejan consenso de traders sofisticados sobre probabilidades de eventos.", weight: "Baja (0.12-0.18)", apiKey: false, status: "active" },
   { id: 12, name: "Injuries", icon: "🏥", source: "ESPN injuries API", description: "Monitorea jugadores lesionados, cuestionables o fuera. Un star player out puede mover lineas 3-5 puntos.", weight: "Media (0.15-0.22)", apiKey: false, status: "beta" },
+  { id: 13, name: "Back-to-Back / Fatiga", icon: "😴", source: "ESPN schedule", description: "Equipos jugando en back-to-back (<28h descanso) rinden 3-5% menos. El oponente descansado tiene ventaja.", weight: "Media (0.14)", apiKey: false, status: "active" },
+  { id: 14, name: "Home/Away", icon: "🏟️", source: "Historico", description: "NBA equipos ganan 58% en casa, MLB 54%. Ventaja de cancha/campo aplicada a todos los juegos.", weight: "Baja (0.08)", apiKey: false, status: "active" },
+  { id: 15, name: "Pace of Play", icon: "⏱️", source: "NBA stats", description: "Ritmo de juego (posesiones/48min). Fast pace = mas puntos = OVER. Slow pace = UNDER. Senal #1 para totals.", weight: "Alta (0.16)", apiKey: false, status: "active" },
+  { id: 16, name: "Altitude / Park Factor", icon: "⛰️", source: "Hardcoded", description: "Coors Field (5,280ft): bola viaja 5-10% mas lejos = OVER. Park factors de 0.91 a 1.38 por estadio MLB.", weight: "Media-Alta (0.12-0.20)", apiKey: false, status: "active" },
+  { id: 17, name: "Head-to-Head", icon: "🤝", source: "ESPN", description: "Historial directo entre equipos. Algunos matchups favorecen consistentemente a un equipo.", weight: "Baja (0.10)", apiKey: false, status: "beta" },
+  { id: 18, name: "Closing Line Value", icon: "📉", source: "Odds snapshots", description: "Compara odds de apertura vs actuales. Si la linea se movio a tu favor = sharps de acuerdo contigo.", weight: "Alta (0.18)", apiKey: false, status: "active" },
+  { id: 19, name: "Streaks / Regresion", icon: "🔥", source: "Resultados recientes", description: "Rachas calientes/frias y deteccion de regresion. Equipos con >75% win rate en ultimos 10 juegos tienden a regresar.", weight: "Baja (0.10-0.12)", apiKey: false, status: "active" },
+  { id: 20, name: "Playoff Motivation", icon: "🏆", source: "Standings", description: "Equipos peleando por playoffs muestran motivacion elevada. Eliminados descansan jugadores.", weight: "Media (0.12-0.14)", apiKey: false, status: "active" },
 ];
 
 function useEngineStats() {
@@ -54,6 +62,14 @@ function useEngineStats() {
           "Weather": ["WEATHER", "clima"],
           "Polymarket": ["POLYMARKET", "Polymarket"],
           "Injuries": ["INJURY", "lesion"],
+          "Back-to-Back / Fatiga": ["FATIGUE", "back-to-back", "REST"],
+          "Home/Away": ["HOME", "home"],
+          "Pace of Play": ["PACE", "pace"],
+          "Altitude / Park Factor": ["ALTITUDE", "Coors", "park factor"],
+          "Head-to-Head": ["H2H", "head-to-head"],
+          "Closing Line Value": ["CLV", "linea abrio"],
+          "Streaks / Regresion": ["STREAK", "REGRESSION", "racha"],
+          "Playoff Motivation": ["PLAYOFF", "TANK", "motivacion"],
         };
         const keys = patterns[sig.name] ?? [sig.name];
         if (keys.some((k) => reasoning.toLowerCase().includes(k.toLowerCase()))) {
