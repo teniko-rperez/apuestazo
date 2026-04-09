@@ -134,19 +134,43 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
     }
   }
 
-  // ─── Signal 1: +EV Edge ───
-  for (const ev of input.evs) {
-    const score = ev.confidence === 'alta' ? 0.30 : ev.confidence === 'media' ? 0.20 : 0.12;
-    addSignal(
-      ev.event_id,
-      ev.market_key,
-      ev.outcome_name,
-      ev.bookmaker_key,
-      ev.odds,
-      'EV',
-      score,
-      `+EV ${formatPct(ev.edge_pct)} ventaja (${ev.confidence})`
-    );
+  // ─── Signal 1: FAVORITO (highest-odds favorite per event) ───
+  // For each event, identify the favorite (lowest/most negative odds = biggest favorite)
+  // and give it a massive weight so the engine always prioritizes favorites
+  {
+    const eventFavorites = new Map<string, { event_id: string; outcome_name: string; bookmaker_key: string; odds: number; impliedProb: number }>();
+    // Scan all h2h odds to find the favorite per event
+    for (const ev of input.evs) {
+      if (ev.market_key !== 'h2h') continue;
+      const implied = americanToImplied(ev.odds);
+      const existing = eventFavorites.get(ev.event_id);
+      if (!existing || implied > existing.impliedProb) {
+        eventFavorites.set(ev.event_id, {
+          event_id: ev.event_id,
+          outcome_name: ev.outcome_name,
+          bookmaker_key: ev.bookmaker_key,
+          odds: ev.odds,
+          impliedProb: implied,
+        });
+      }
+    }
+    // Also scan from eventTeams + any h2h odds data we can infer
+    // The favorite signal is the core signal - 0.50 weight minimum
+    for (const [, fav] of eventFavorites) {
+      const prob = fav.impliedProb;
+      // Higher implied probability = stronger favorite = higher score
+      const score = prob >= 0.75 ? 0.55 : prob >= 0.65 ? 0.50 : prob >= 0.55 ? 0.45 : 0.40;
+      addSignal(
+        fav.event_id,
+        'h2h',
+        fav.outcome_name,
+        fav.bookmaker_key,
+        fav.odds,
+        'FAVORITO',
+        score,
+        `Favorito con ${(prob * 100).toFixed(0)}% probabilidad implicita (odds ${formatOdds(fav.odds)})`
+      );
+    }
   }
 
   // ─── Signal 2: Arbitrage ───
@@ -515,7 +539,7 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
   const now = Date.now();
 
   // Categorize signal types for weighting
-  const MARKET_SIGNALS = new Set(['EV', 'ARB', 'DISCREPANCY', 'CLV', 'STEAM', 'LINE_MOVE']);
+  const MARKET_SIGNALS = new Set(['FAVORITO', 'ARB', 'DISCREPANCY', 'CLV', 'STEAM', 'LINE_MOVE']);
   const DATA_SIGNALS = new Set(['STATS', 'PACE', 'ALTITUDE', 'WEATHER', 'FATIGUE', 'REST', 'HOME', 'STREAK', 'REGRESSION', 'PLAYOFF', 'TANK']);
   const CROWD_SIGNALS = new Set(['EXPERT', 'ROBINHOOD', 'POLYMARKET', 'CONTRARIAN']);
 
@@ -548,7 +572,7 @@ export function generateRecommendations(input: EngineInput): ScoredRecommendatio
     // Determine type
     let type = 'value';
     if (c.signals.includes('ARB')) type = 'arbitrage';
-    else if (c.signals.includes('EV') && c.signals.length >= 2) type = 'ev';
+    else if (c.signals.includes('FAVORITO')) type = 'favorite';
     else if (c.signals.includes('STEAM')) type = 'steam';
     else if (c.signals.includes('EXPERT') && c.signals.length >= 2) type = 'expert';
 

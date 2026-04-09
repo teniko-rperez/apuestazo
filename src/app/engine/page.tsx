@@ -15,7 +15,7 @@ interface SignalDef {
 }
 
 const SIGNALS: SignalDef[] = [
-  { id: 1, key: "EV", name: "+EV Edge", source: "The Odds API + ESPN", description: "Detecta apuestas donde las odds ofrecidas son mejores que las odds justas. Usa power devig para eliminar el vig y encontrar valor real.", rawWeight: 0.30, apiKey: true, status: "active" },
+  { id: 1, key: "FAVORITO", name: "Favorito", source: "Odds de todas las casas", description: "Identifica al equipo favorito por probabilidad implicita de las odds. La senal mas importante - el favorito gana la mayoria de los juegos.", rawWeight: 0.50, apiKey: false, status: "active" },
   { id: 2, key: "ARB", name: "Arbitraje", source: "Multi-bookmaker", description: "Encuentra combinaciones de apuestas en diferentes casas que garantizan ganancia sin importar el resultado.", rawWeight: 0.25, apiKey: false, status: "active" },
   { id: 3, key: "STEAM", name: "Steam Moves", source: "Line tracking", description: "Detecta cuando 3+ casas mueven las lineas en la misma direccion. Indica dinero inteligente.", rawWeight: 0.20, apiKey: false, status: "active" },
   { id: 4, key: "LINE_MOVE", name: "Line Movement", source: "Odds snapshots", description: "Monitorea cambios significativos en las lineas entre snapshots.", rawWeight: 0.10, apiKey: false, status: "active" },
@@ -50,7 +50,7 @@ function useEngineStats() {
       const reasoning = (r.reasoning as string) ?? "";
       for (const sig of SIGNALS) {
         const patterns: Record<string, string[]> = {
-          "+EV Edge": ["+EV", "EV"], "Arbitraje": ["ARB"], "Steam Moves": ["STEAM"],
+          "Favorito": ["FAVORITO", "Favorito"], "Arbitraje": ["ARB"], "Steam Moves": ["STEAM"],
           "Line Movement": ["LINE_MOVE"], "Expert Consensus": ["EXPERT"], "Odds Discrepancies": ["DISCREPANCY"],
           "Contrarian Value": ["CONTRARIAN"], "Robinhood/Kalshi": ["ROBINHOOD", "Kalshi"],
           "Team Stats": ["STATS"], "Weather": ["WEATHER"], "Polymarket": ["POLYMARKET"],

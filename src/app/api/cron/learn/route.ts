@@ -52,11 +52,11 @@ export async function GET(request: Request) {
     // 3. Store learning history
     const changes: Record<string, { from: number; to: number; reason: string }> = {};
     const DEFAULT_W: Record<string, number> = {
-      EV: 0.30, ARB: 0.25, STEAM: 0.20, LINE_MOVE: 0.10, EXPERT: 0.18,
-      DISCREPANCY: 0.12, CONTRARIAN: 0.10, ROBINHOOD: 0.16, POLYMARKET: 0.14,
-      STATS: 0.16, WEATHER: 0.12, ALTITUDE: 0.14, PACE: 0.16, FATIGUE: 0.14,
-      REST: 0.10, HOME: 0.08, CLV: 0.18, STREAK: 0.10, REGRESSION: 0.12,
-      PLAYOFF: 0.14, TANK: 0.12,
+      FAVORITO: 0.50, ARB: 0.15, STEAM: 0.12, LINE_MOVE: 0.06, EXPERT: 0.10,
+      DISCREPANCY: 0.08, CONTRARIAN: 0.06, ROBINHOOD: 0.10, POLYMARKET: 0.08,
+      STATS: 0.10, WEATHER: 0.06, ALTITUDE: 0.08, PACE: 0.10, FATIGUE: 0.08,
+      REST: 0.06, HOME: 0.05, CLV: 0.10, STREAK: 0.06, REGRESSION: 0.06,
+      PLAYOFF: 0.08, TANK: 0.06,
     };
     for (const [signal, newW] of Object.entries(config.signal_weights)) {
       const oldW = DEFAULT_W[signal] ?? 0.12;
