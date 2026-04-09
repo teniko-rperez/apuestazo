@@ -15,6 +15,7 @@ const NAV = [
   { href: "/valor", label: "Valor +EV", icon: "📈" },
   { href: "/expertos", label: "Expertos", icon: "👥" },
   { href: "/engine", label: "Engine Matrix", icon: "⚙️" },
+  { href: "/historial", label: "Historial", icon: "📜" },
 ];
 
 export function Navbar() {
