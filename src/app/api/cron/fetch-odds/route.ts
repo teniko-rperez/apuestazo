@@ -48,6 +48,23 @@ export async function GET(request: Request) {
           const t = new Date().toISOString();
           await supabase.from('odds_snapshots').insert(odds.map((o) => ({ event_id: o.event_id, bookmaker_key: o.bookmaker_key, market_key: o.market_key, outcomes: o.outcomes, fetched_at: t })));
         }
+        // Cross-update: sync ESPN scores to Odds API events (different IDs, same games)
+        const completedEspn = events.filter((e) => e.completed && e.scores);
+        if (completedEspn.length > 0) {
+          for (const espnEv of completedEspn) {
+            // Find matching Odds API event by team names
+            const { data: oddsApiEvents } = await supabase.from('events')
+              .select('id')
+              .eq('home_team', espnEv.home_team)
+              .eq('away_team', espnEv.away_team)
+              .eq('completed', false)
+              .not('id', 'like', 'espn_%');
+            for (const oaEv of oddsApiEvents ?? []) {
+              await supabase.from('events').update({ completed: true, scores: espnEv.scores }).eq('id', oaEv.id);
+            }
+          }
+          ss.crossUpdated = completedEspn.length;
+        }
       } catch (e) { ss.error = String(e); }
 
       // 1b. The Odds API (6 bookmakers, 500 req/month free)
