@@ -111,7 +111,8 @@ function BetRow({ bet }: { bet: SimBet }) {
             {bet.events ? `${bet.events.away_team} vs ${bet.events.home_team}` : ""}
             {bet.events && <span className="text-[9px] text-blue-500 font-bold ml-1">({bet.events.home_team} HOME)</span>}
           </p>
-          <p className="text-[12px] font-semibold text-gray-800 truncate">
+          <p className="text-[12px] text-gray-800 truncate">
+            <span className="font-bold">Ganador:</span>{" "}
             {bet.outcome_name}
             {bet.events && bet.outcome_name === bet.events.home_team && <span className="text-[9px] text-blue-500 ml-1">HOME</span>}
           </p>
