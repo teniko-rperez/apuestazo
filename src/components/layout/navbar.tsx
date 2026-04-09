@@ -151,27 +151,31 @@ export function Navbar() {
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className={cn(
-                "h-9 w-9 flex items-center justify-center rounded-xl transition-all duration-300 active:scale-90",
+                "h-11 w-11 flex items-center justify-center rounded-2xl transition-all duration-300 active:scale-85",
                 menuOpen
-                  ? "bg-orange-500 text-white rotate-0 shadow-lg shadow-orange-500/30"
+                  ? "bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-xl shadow-orange-500/40 scale-105"
                   : isMoreActive
-                    ? "bg-orange-500/20 text-orange-400"
-                    : "bg-white/10 text-white/70 hover:bg-white/15"
+                    ? "bg-gradient-to-br from-orange-500/30 to-orange-600/20 text-orange-400 ring-2 ring-orange-500/30"
+                    : "bg-white/15 text-white hover:bg-white/25 hover:scale-105"
               )}>
-              <div className="relative w-5 h-5 flex flex-col items-center justify-center">
+              <div className="relative w-6 h-6 flex flex-col items-center justify-center">
                 <span className={cn(
-                  "absolute w-4 h-[2px] bg-current rounded-full transition-all duration-300 ease-out",
-                  menuOpen ? "rotate-45 translate-y-0" : "-translate-y-[5px]"
+                  "absolute h-[2.5px] bg-current rounded-full transition-all duration-300 ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]",
+                  menuOpen ? "w-5 rotate-45 translate-y-0" : "w-5 -translate-y-[7px]"
                 )} />
                 <span className={cn(
-                  "absolute w-4 h-[2px] bg-current rounded-full transition-all duration-200",
-                  menuOpen ? "opacity-0 scale-0" : "opacity-100 scale-100"
+                  "absolute w-3.5 h-[2.5px] bg-current rounded-full transition-all duration-200",
+                  menuOpen ? "opacity-0 scale-0 rotate-180" : "opacity-100 scale-100 rotate-0"
                 )} />
                 <span className={cn(
-                  "absolute w-4 h-[2px] bg-current rounded-full transition-all duration-300 ease-out",
-                  menuOpen ? "-rotate-45 translate-y-0" : "translate-y-[5px]"
+                  "absolute h-[2.5px] bg-current rounded-full transition-all duration-300 ease-[cubic-bezier(0.68,-0.6,0.32,1.6)]",
+                  menuOpen ? "w-5 -rotate-45 translate-y-0" : "w-4 translate-y-[7px]"
                 )} />
               </div>
+              {/* Notification dot when on a "more" page */}
+              {isMoreActive && !menuOpen && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 ring-2 ring-[#0f172a] animate-pulse" />
+              )}
             </button>
           </div>
         </div>
