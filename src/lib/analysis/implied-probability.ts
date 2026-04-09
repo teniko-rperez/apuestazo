@@ -23,6 +23,7 @@ export function americanToImplied(odds: number): number {
 /** Remove vig from a set of outcomes to get fair probabilities */
 export function removeVig(impliedProbs: number[]): number[] {
   const total = impliedProbs.reduce((sum, p) => sum + p, 0);
+  if (total === 0) return impliedProbs;
   return impliedProbs.map((p) => p / total);
 }
 

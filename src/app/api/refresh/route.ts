@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
 
 export async function POST() {
   const cronSecret = process.env.CRON_SECRET;
@@ -7,12 +8,11 @@ export async function POST() {
   }
 
   try {
-    // Call the cron job internally
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_SUPABASE_URL
-        ? 'https://apuestazo.vercel.app'
-        : 'http://localhost:3000';
+    // Get the host from request headers
+    const headersList = await headers();
+    const host = headersList.get('host') ?? 'apuestazo.vercel.app';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const baseUrl = `${protocol}://${host}`;
 
     const res = await fetch(`${baseUrl}/api/cron/fetch-odds`, {
       method: 'GET',
@@ -22,9 +22,6 @@ export async function POST() {
     const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to refresh', details: String(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to refresh', details: String(error) }, { status: 500 });
   }
 }

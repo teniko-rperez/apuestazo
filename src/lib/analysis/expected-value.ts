@@ -49,8 +49,9 @@ export function detectEv(
   const avgOdds = outcomeNames.map((name) => {
     const prices = outcomeOdds.get(name)!.map((o) => o.odds);
     // Average in implied probability space (more accurate)
-    const avgImplied =
-      prices.reduce((s, o) => s + americanToImplied(o), 0) / prices.length;
+    const avgImplied = prices.length > 0
+      ? prices.reduce((s, o) => s + americanToImplied(o), 0) / prices.length
+      : 0.5;
     // Convert back to American
     return avgImplied > 0.5
       ? -Math.round((avgImplied / (1 - avgImplied)) * 100)
