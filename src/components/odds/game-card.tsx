@@ -27,6 +27,8 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
   const isOutdoor = event.sport_key === 'baseball_mlb' && OUTDOOR_TEAMS.has(event.home_team);
   const bestHome = findBest(h2h, event.home_team);
   const bestAway = findBest(h2h, event.away_team);
+  const homeFav = bestHome && bestAway && bestHome.price < bestAway.price;
+  const awayFav = bestHome && bestAway && bestAway.price < bestHome.price;
   const time = new Date(event.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" });
   const date = new Date(event.commence_time).toLocaleDateString("es-PR", { weekday: "short", month: "short", day: "numeric" });
 
@@ -61,7 +63,10 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
                 <span className="text-[11px] font-black text-gray-400">VS</span>
               </div>
               <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-gray-900 truncate">{event.away_team}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[14px] font-semibold text-gray-900 truncate">{event.away_team}</p>
+                  {awayFav && <span className="shrink-0 text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">FAV</span>}
+                </div>
                 <p className="text-[10px] text-gray-400">Visitante</p>
               </div>
             </div>
@@ -87,7 +92,10 @@ export function GameCard({ event, odds, sportPath, hasArb, hasEv }: GameCardProp
                 </svg>
               </div>
               <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-gray-900 truncate">{event.home_team}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[14px] font-semibold text-gray-900 truncate">{event.home_team}</p>
+                  {homeFav && <span className="shrink-0 text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">FAV</span>}
+                </div>
                 <p className="text-[10px] text-blue-500 font-semibold">HOME</p>
               </div>
             </div>

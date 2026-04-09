@@ -68,6 +68,11 @@ function RecCard({ rec }: { rec: Record<string, unknown> }) {
       <p className="text-[12px] text-gray-500 mb-1">
         {ev ? `${ev.away_team} vs ${ev.home_team}` : ""}
         {ev && <span className="text-blue-500 font-semibold ml-1">({ev.home_team} HOME)</span>}
+        {ev && odds < 0 && (rec.outcome_name as string) && (
+          <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded ml-1.5">
+            {rec.outcome_name as string} FAV
+          </span>
+        )}
       </p>
       {time && <p className="text-[10px] text-gray-400 mb-2">{time}</p>}
 
@@ -124,7 +129,10 @@ function SimRow({ bet }: { bet: Record<string, unknown> }) {
       </div>
       <p className="text-[12px] text-gray-500 mb-0.5">{ev ? `${ev.away_team} vs ${ev.home_team}` : ""}</p>
       <div className="flex items-center justify-between">
-        <p className="text-[14px] font-bold text-gray-900">{bet.outcome_name as string}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-[14px] font-bold text-gray-900">{bet.outcome_name as string}</p>
+          {odds < 0 && <span className="text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">FAV</span>}
+        </div>
         <span className="text-[15px] font-extrabold text-orange-500 font-mono">{formatOdds(odds)}</span>
       </div>
       {ev?.scores && (

@@ -120,6 +120,11 @@ function BetCard({ bet }: { bet: SimBet }) {
             {bet.events ? `${bet.events.home_team}` : ""}
             {bet.events?.scores && <span className="font-bold text-gray-800 mx-1">{bet.events.scores.home}</span>}
             {bet.events && <span className="text-[10px] text-blue-500 font-semibold ml-1">({bet.events.home_team} HOME)</span>}
+            {bet.odds < 0 && (
+              <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded ml-1.5">
+                {bet.outcome_name} FAV
+              </span>
+            )}
           </p>
           {bet.events?.commence_time && (
             <p className="text-[10px] text-gray-400 mt-0.5">
@@ -133,10 +138,11 @@ function BetCard({ bet }: { bet: SimBet }) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[10px] text-gray-400 font-medium">Ganador</p>
-            <p className="text-[16px] font-bold text-gray-900">
-              {bet.outcome_name}
-              {bet.events && bet.outcome_name === bet.events.home_team && <span className="text-[9px] text-blue-500 font-semibold ml-1">HOME</span>}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[16px] font-bold text-gray-900">{bet.outcome_name}</p>
+              {bet.events && bet.outcome_name === bet.events.home_team && <span className="text-[9px] text-blue-500 font-semibold">HOME</span>}
+              {bet.odds < 0 && <span className="text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">FAV</span>}
+            </div>
           </div>
           <div className="text-right">
             <p className="text-xl font-extrabold text-orange-500 font-mono">{formatOdds(bet.odds)}</p>
