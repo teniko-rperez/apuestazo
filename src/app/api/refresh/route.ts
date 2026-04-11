@@ -8,8 +8,15 @@ export async function POST() {
   }
 
   try {
-    // Get the host from request headers
     const headersList = await headers();
+
+    // Require auth: bearer token OR Vercel cron header
+    const auth = headersList.get('authorization');
+    const isVercelCron = headersList.get('x-vercel-cron') === '1';
+    if (!isVercelCron && auth !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const host = headersList.get('host') ?? 'apuestazo.vercel.app';
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const baseUrl = `${protocol}://${host}`;

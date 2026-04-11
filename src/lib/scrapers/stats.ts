@@ -6,24 +6,39 @@
 
 // ═══ NBA Stats (balldontlie.io) ═══
 
-interface BdlPlayer {
-  id: number;
-  first_name: string;
-  last_name: string;
-  team: { full_name: string; abbreviation: string };
-}
-
-interface BdlSeasonAvg {
-  pts: number;
-  reb: number;
-  ast: number;
-  stl: number;
-  blk: number;
-  fg_pct: number;
-  fg3_pct: number;
-  ft_pct: number;
-  min: string;
-  games_played: number;
+/**
+ * Free NBA team standings via ESPN (no API key required).
+ * Returns a map of team display name → {win_pct, avg_points, recent_form}.
+ * Used as a fallback when BALLDONTLIE_API_KEY is not set.
+ */
+export async function fetchNbaStandingsEspn(): Promise<Map<string, { win_pct: number; avg_points?: number; recent_form?: string }>> {
+  const out = new Map<string, { win_pct: number; avg_points?: number; recent_form?: string }>();
+  try {
+    const res = await fetch('https://site.api.espn.com/apis/v2/sports/basketball/nba/standings', {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return out;
+    const data = await res.json() as {
+      children?: Array<{
+        standings?: { entries?: Array<{
+          team: { displayName: string };
+          stats: Array<{ name: string; value: number; displayValue: string }>;
+        }> };
+      }>;
+    };
+    for (const conf of data.children ?? []) {
+      for (const entry of conf.standings?.entries ?? []) {
+        const name = entry.team.displayName;
+        const statsByName = new Map(entry.stats.map((s) => [s.name, s.value]));
+        const winPct = statsByName.get('winPercent') ?? 0;
+        const avgPoints = statsByName.get('avgPointsFor');
+        const streakVal = entry.stats.find((s) => s.name === 'streak')?.displayValue ?? '';
+        out.set(name, { win_pct: winPct, avg_points: avgPoints, recent_form: streakVal });
+      }
+    }
+  } catch { /* ok */ }
+  return out;
 }
 
 export interface NbaTeamStats {

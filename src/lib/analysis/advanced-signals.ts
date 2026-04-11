@@ -317,8 +317,20 @@ export function computeInjuryAdvantage(
   awayTeam: string,
   injuryReports: Map<string, { impact: string; star_out_count: number; total_out_count: number; description: string }>,
 ): InjurySignal[] {
-  const homeReport = injuryReports.get(homeTeam);
-  const awayReport = injuryReports.get(awayTeam);
+  // Fuzzy match: try exact first, then match by last word of team name (e.g. "Celtics")
+  const findReport = (team: string) => {
+    const exact = injuryReports.get(team);
+    if (exact) return exact;
+    const lastWord = team.split(' ').pop()?.toLowerCase() ?? '';
+    for (const [key, val] of injuryReports) {
+      const keyLast = key.split(' ').pop()?.toLowerCase() ?? '';
+      if (keyLast === lastWord && lastWord.length > 2) return val;
+    }
+    return undefined;
+  };
+
+  const homeReport = findReport(homeTeam);
+  const awayReport = findReport(awayTeam);
 
   const homeImpact = (homeReport?.impact ?? 'none') as InjurySignal['team_impact'];
   const awayImpact = (awayReport?.impact ?? 'none') as InjurySignal['team_impact'];

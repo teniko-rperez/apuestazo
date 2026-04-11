@@ -19,9 +19,20 @@ export interface PolyContract {
 interface PolyMarketRaw {
   condition_id: string;
   question: string;
-  tokens: Array<{ token_id: string; outcome: string; price: number }>;
-  volume_num_24hr: number;
+  tokens: Array<{ token_id: string; outcome: string; price: number; winner?: boolean }>;
   active: boolean;
+  closed: boolean;
+  archived?: boolean;
+  accepting_orders?: boolean;
+  game_start_time?: string | null;
+  end_date_iso?: string | null;
+  volume_24hr?: number;
+  volume_num_24hr?: number;
+}
+
+interface PolyListResponse {
+  data: PolyMarketRaw[];
+  next_cursor?: string;
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -47,31 +58,67 @@ function classifySport(question: string): 'nba' | 'mlb' | 'other' {
 
 /**
  * Fetch sports-related Polymarket contracts.
+ * The CLOB /markets endpoint returns { data: [...] } with ~500 markets per page;
+ * we walk pages until we exhaust them or hit a safety cap.
+ * Each market has 2 tokens (one per outcome); we emit one PolyContract per token
+ * so the engine can match each side against a team name.
  */
 export async function fetchPolymarketSports(): Promise<PolyContract[]> {
-  // Polymarket uses a sampling endpoint
-  const data = await fetchJson<PolyMarketRaw[]>(`${POLY_API}/markets?limit=100&active=true`);
-  if (!data) return [];
-
   const contracts: PolyContract[] = [];
+  const nowIso = new Date().toISOString();
+  const cutoffPast = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  for (const m of data) {
-    const sport = classifySport(m.question);
-    if (sport === 'other') continue;
+  let cursor: string | undefined = '';
+  let pages = 0;
+  const maxPages = 6; // safety cap
 
-    const yesToken = m.tokens?.find((t) => t.outcome === 'Yes');
-    const noToken = m.tokens?.find((t) => t.outcome === 'No');
+  while (pages < maxPages) {
+    const url: string = cursor
+      ? `${POLY_API}/markets?next_cursor=${encodeURIComponent(cursor)}`
+      : `${POLY_API}/markets`;
+    const page: PolyListResponse | null = await fetchJson<PolyListResponse>(url);
+    if (!page || !Array.isArray(page.data)) break;
 
-    contracts.push({
-      condition_id: m.condition_id,
-      question: m.question,
-      outcome_yes: 'Yes',
-      outcome_no: 'No',
-      yes_price: yesToken?.price ?? 0,
-      no_price: noToken?.price ?? 0,
-      volume: m.volume_num_24hr ?? 0,
-      sport,
-    });
+    for (const m of page.data) {
+      // Only current, tradeable sports markets
+      if (m.closed || m.archived || !m.active) continue;
+      if (m.accepting_orders === false) continue;
+
+      // Filter by game start time: ignore games older than 24h ago and >30 days out
+      if (m.game_start_time) {
+        if (m.game_start_time < cutoffPast) continue;
+      } else if (m.end_date_iso && m.end_date_iso < nowIso) {
+        continue;
+      }
+
+      const sport = classifySport(m.question);
+      if (sport === 'other') continue;
+
+      const tokens = m.tokens ?? [];
+      if (tokens.length === 0) continue;
+
+      const volume = m.volume_num_24hr ?? m.volume_24hr ?? 0;
+
+      // Emit one contract per token so the engine can match per outcome.
+      for (const t of tokens) {
+        if (!t || typeof t.price !== 'number') continue;
+        const otherPrice = tokens.find((x) => x.token_id !== t.token_id)?.price ?? 1 - t.price;
+        contracts.push({
+          condition_id: m.condition_id,
+          question: `${m.question} — ${t.outcome}`,
+          outcome_yes: t.outcome,
+          outcome_no: tokens.find((x) => x.token_id !== t.token_id)?.outcome ?? 'Other',
+          yes_price: t.price,
+          no_price: otherPrice,
+          volume,
+          sport,
+        });
+      }
+    }
+
+    cursor = page.next_cursor && page.next_cursor !== 'LTE=' ? page.next_cursor : undefined;
+    if (!cursor) break;
+    pages++;
   }
 
   return contracts;

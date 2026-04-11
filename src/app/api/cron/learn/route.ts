@@ -79,55 +79,66 @@ export async function GET(request: Request) {
       .eq('result', 'pending');
 
     let cancelled = 0;
-    if (pendingBets) {
-      for (const bet of pendingBets) {
-        // Don't cancel bets for games already started
-        const { data: ev } = await supabase.from('events').select('commence_time').eq('id', bet.event_id).single();
-        if (ev && new Date(ev.commence_time as string).getTime() < Date.now()) continue;
+    if (pendingBets && pendingBets.length > 0) {
+      // Batch load event times + active recommendations to avoid N+1
+      const pendingEventIds = [...new Set(pendingBets.map((b) => b.event_id as string))];
+      const nowIso = new Date().toISOString();
 
-        // Check odds range (new filter)
+      const [{ data: batchEvents }, { data: batchRecs }] = await Promise.all([
+        supabase.from('events').select('id, commence_time').in('id', pendingEventIds),
+        supabase.from('recommendations').select('event_id, confidence_score, reasoning')
+          .in('event_id', pendingEventIds).gte('valid_until', nowIso)
+          .order('confidence_score', { ascending: false }),
+      ]);
+
+      const eventTimeMap = new Map((batchEvents ?? []).map((e) => [e.id as string, e.commence_time as string]));
+      const bestRecByEvent = new Map<string, { confidence_score: number; reasoning: string }>();
+      for (const rec of (batchRecs ?? []) as Array<Record<string, unknown>>) {
+        const eid = rec.event_id as string;
+        if (!bestRecByEvent.has(eid)) {
+          bestRecByEvent.set(eid, {
+            confidence_score: rec.confidence_score as number,
+            reasoning: (rec.reasoning as string) ?? '',
+          });
+        }
+      }
+
+      const cancelUpdates: Array<{ id: unknown; reasoning: string }> = [];
+      const now = Date.now();
+
+      for (const bet of pendingBets) {
+        const commence = eventTimeMap.get(bet.event_id as string);
+        if (commence && new Date(commence).getTime() < now) continue;
+
         const odds = bet.odds as number;
         if (odds > 0 && odds > config.max_odds) {
-          await supabase.from('simulated_bets').update({
-            result: 'push', profit: 0, settled_at: new Date().toISOString(),
-            reasoning: (bet.reasoning ?? '') + ` [CANCELADA por learning: odds +${odds} > max +${config.max_odds}]`,
-          }).eq('id', bet.id);
-          cancelled++;
+          cancelUpdates.push({ id: bet.id, reasoning: (bet.reasoning ?? '') + ` [CANCELADA por learning: odds +${odds} > max +${config.max_odds}]` });
           continue;
         }
         if (odds < 0 && odds < config.min_odds) {
-          await supabase.from('simulated_bets').update({
-            result: 'push', profit: 0, settled_at: new Date().toISOString(),
-            reasoning: (bet.reasoning ?? '') + ` [CANCELADA por learning: odds ${odds} < min ${config.min_odds}]`,
-          }).eq('id', bet.id);
-          cancelled++;
+          cancelUpdates.push({ id: bet.id, reasoning: (bet.reasoning ?? '') + ` [CANCELADA por learning: odds ${odds} < min ${config.min_odds}]` });
           continue;
         }
 
-        // Check recommendation still valid
-        const { data: recs } = await supabase.from('recommendations')
-          .select('confidence_score, reasoning')
-          .eq('event_id', bet.event_id)
-          .gte('valid_until', new Date().toISOString())
-          .order('confidence_score', { ascending: false }).limit(1);
-
-        if (!recs || recs.length === 0) {
-          await supabase.from('simulated_bets').update({
-            result: 'push', profit: 0, settled_at: new Date().toISOString(),
-            reasoning: (bet.reasoning ?? '') + ' [CANCELADA por learning: sin recomendacion activa]',
-          }).eq('id', bet.id);
-          cancelled++;
+        const rec = bestRecByEvent.get(bet.event_id as string);
+        if (!rec) {
+          cancelUpdates.push({ id: bet.id, reasoning: (bet.reasoning ?? '') + ' [CANCELADA por learning: sin recomendacion activa]' });
           continue;
         }
 
-        const { cancel, reason } = shouldCancelBet(recs[0].reasoning as string, recs[0].confidence_score as number, config, odds);
+        const { cancel, reason } = shouldCancelBet(rec.reasoning, rec.confidence_score, config, odds);
         if (cancel) {
-          await supabase.from('simulated_bets').update({
-            result: 'push', profit: 0, settled_at: new Date().toISOString(),
-            reasoning: (bet.reasoning ?? '') + ` [CANCELADA por learning: ${reason}]`,
-          }).eq('id', bet.id);
-          cancelled++;
+          cancelUpdates.push({ id: bet.id, reasoning: (bet.reasoning ?? '') + ` [CANCELADA por learning: ${reason}]` });
         }
+      }
+
+      // Apply cancellations (still individual updates — Supabase has no batch-update-by-id)
+      const settledAt = new Date().toISOString();
+      for (const u of cancelUpdates) {
+        await supabase.from('simulated_bets').update({
+          result: 'cancelled', profit: 0, settled_at: settledAt, reasoning: u.reasoning,
+        }).eq('id', u.id);
+        cancelled++;
       }
     }
     summary.betsCancelled = cancelled;

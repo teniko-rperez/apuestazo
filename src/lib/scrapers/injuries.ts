@@ -24,10 +24,12 @@ export interface TeamInjuryReport {
 
 interface EspnInjuryResponse {
   injuries?: Array<{
-    team?: { displayName?: string };
+    displayName?: string; // Team name is directly on the entry, NOT nested under team
+    team?: { displayName?: string }; // fallback
     injuries?: Array<{
       athlete?: { displayName?: string; position?: { abbreviation?: string } };
       status?: string; // "Out", "Questionable", "Day-To-Day", "Doubtful", "Probable"
+      shortComment?: string;
       details?: { detail?: string; type?: string };
     }>;
   }>;
@@ -68,7 +70,7 @@ async function fetchEspnInjuries(sport: 'basketball/nba' | 'baseball/mlb'): Prom
     const reports: TeamInjuryReport[] = [];
 
     for (const team of data.injuries) {
-      const teamName = team.team?.displayName ?? '';
+      const teamName = team.displayName ?? team.team?.displayName ?? '';
       if (!teamName || !team.injuries) continue;
 
       const injuries: PlayerInjury[] = [];
@@ -76,7 +78,7 @@ async function fetchEspnInjuries(sport: 'basketball/nba' | 'baseball/mlb'): Prom
         const playerName = inj.athlete?.displayName ?? '';
         const position = inj.athlete?.position?.abbreviation ?? '';
         const status = normalizeStatus(inj.status);
-        const detail = inj.details?.detail ?? inj.details?.type ?? '';
+        const detail = inj.details?.detail ?? inj.details?.type ?? inj.shortComment ?? '';
 
         if (!playerName) continue;
 

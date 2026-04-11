@@ -59,12 +59,12 @@ export function detectArbitrage(
   if (profitMargin < 0.005) return null;
 
   // Calculate optimal stake percentages for each leg
-  const legs: ArbLeg[] = entries.map(([, { bookmaker, odds }]) => {
+  const legs: ArbLeg[] = entries.map(([key, { bookmaker, odds }]) => {
     const decimal = americanToDecimal(odds);
     const stakePct = (1 / decimal) / totalImplied;
     return {
       bookmaker,
-      outcome_name: entries.find(([, v]) => v.bookmaker === bookmaker && v.odds === odds)?.[0].split('|')[0] ?? '',
+      outcome_name: key.split('|')[0],
       odds,
       stake_pct: stakePct,
     };

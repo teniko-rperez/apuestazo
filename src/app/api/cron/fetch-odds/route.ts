@@ -10,7 +10,7 @@ import { detectLineMovements, detectSteamMoves } from '@/lib/analysis/line-movem
 import { generateRecommendations, type EngineInput } from '@/lib/analysis/recommendation-engine';
 import type { LatestOdds, OddsSnapshot } from '@/types/odds';
 import { fetchKalshiSportsMarkets } from '@/lib/scrapers/kalshi';
-import { fetchNbaTeamStats, fetchMlbTeamStats } from '@/lib/scrapers/stats';
+import { fetchNbaTeamStats, fetchNbaStandingsEspn } from '@/lib/scrapers/stats';
 import { detectFatigue, computeHomeAdvantage, computePace, computeAltitude, computeCLV, detectStreak, computePlayoffMotivation, computeInjuryAdvantage, type FatigueSignal, type HomeAwaySignal, type PaceSignal, type AltitudeSignal, type CLVSignal, type StreakSignal, type PlayoffSignal, type InjurySignal } from '@/lib/analysis/advanced-signals';
 import { fetchAllInjuries } from '@/lib/scrapers/injuries';
 import type { LearnedConfig } from '@/lib/analysis/learning-engine';
@@ -70,23 +70,26 @@ export async function GET(request: Request) {
             .eq('completed', false)
             .not('id', 'like', 'espn_%');
 
-          let crossCount = 0;
+          // Build a key → espn result map once, then do single lookups per OA event
+          const oaEventsList = oddsApiEvents ?? [];
+          const espnByKey = new Map<string, { scores: unknown }>();
           for (const espnEv of completedEspn) {
-            // Fuzzy match: check if last word of team name matches
-            const espnHomeLast = espnEv.home_team.split(' ').pop()?.toLowerCase() ?? '';
-            const espnAwayLast = espnEv.away_team.split(' ').pop()?.toLowerCase() ?? '';
-
-            for (const oaEv of oddsApiEvents ?? []) {
-              const oaHomeLast = oaEv.home_team.split(' ').pop()?.toLowerCase() ?? '';
-              const oaAwayLast = oaEv.away_team.split(' ').pop()?.toLowerCase() ?? '';
-
-              if (espnHomeLast === oaHomeLast && espnAwayLast === oaAwayLast) {
-                await supabase.from('events').update({ completed: true, scores: espnEv.scores }).eq('id', oaEv.id);
-                crossCount++;
-              }
+            const k = `${espnEv.home_team.split(' ').pop()?.toLowerCase() ?? ''}|${espnEv.away_team.split(' ').pop()?.toLowerCase() ?? ''}`;
+            espnByKey.set(k, { scores: espnEv.scores });
+          }
+          // Collect matched event ids and run updates in parallel
+          const matchedIds: string[] = [];
+          const updates: Array<Promise<unknown>> = [];
+          for (const oaEv of oaEventsList) {
+            const k = `${oaEv.home_team.split(' ').pop()?.toLowerCase() ?? ''}|${oaEv.away_team.split(' ').pop()?.toLowerCase() ?? ''}`;
+            const hit = espnByKey.get(k);
+            if (hit) {
+              matchedIds.push(oaEv.id);
+              updates.push(Promise.resolve(supabase.from('events').update({ completed: true, scores: hit.scores }).eq('id', oaEv.id)));
             }
           }
-          ss.crossUpdated = crossCount;
+          await Promise.all(updates);
+          ss.crossUpdated = matchedIds.length;
         }
       } catch (e) { ss.error = String(e); }
 
@@ -99,15 +102,16 @@ export async function GET(request: Request) {
             await logApiUsage(supabase, `/sports/${sportKey}/odds`, creditsUsed, sportKey, ['h2h', 'spreads', 'totals']);
             const t = new Date().toISOString();
             const snaps: Array<{ event_id: string; bookmaker_key: string; market_key: string; outcomes: unknown; fetched_at: string }> = [];
+            const eventUpserts: Array<{ id: string; sport_key: string; commence_time: string; home_team: string; away_team: string }> = [];
             for (const ev of oddsEvents) {
-              // Upsert event from Odds API
-              await supabase.from('events').upsert({ id: ev.id, sport_key: ev.sport_key, commence_time: ev.commence_time, home_team: ev.home_team, away_team: ev.away_team }, { onConflict: 'id' });
+              eventUpserts.push({ id: ev.id, sport_key: ev.sport_key, commence_time: ev.commence_time, home_team: ev.home_team, away_team: ev.away_team });
               for (const bk of ev.bookmakers) {
                 for (const mk of bk.markets) {
                   snaps.push({ event_id: ev.id, bookmaker_key: bk.key, market_key: mk.key, outcomes: mk.outcomes, fetched_at: t });
                 }
               }
             }
+            if (eventUpserts.length > 0) await supabase.from('events').upsert(eventUpserts, { onConflict: 'id' });
             if (snaps.length > 0) await supabase.from('odds_snapshots').insert(snaps);
             ss.oddsApiEvents = oddsEvents.length;
             ss.oddsApiSnapshots = snaps.length;
@@ -213,9 +217,27 @@ export async function GET(request: Request) {
       const scrapedOdds = (curr ?? []).map((s: Record<string, unknown>) => ({ event_id: s.event_id as string, bookmaker_key: s.bookmaker_key as string, bookmaker_name: s.bookmaker_key as string, market_key: s.market_key as string, outcomes: s.outcomes as Array<{ name: string; price: number; point?: number }> }));
       const discrepancies = findOddsDiscrepancies(scrapedOdds);
 
-      // Expert picks
+      // Expert picks — fetch fresh from DB but also keep freshly scraped picks
       const { data: allExperts } = await supabase.from('expert_picks').select('*').gte('scraped_at', new Date(Date.now() - 86400000).toISOString());
-      const typedExperts = (allExperts ?? []) as unknown as ExpertPick[];
+      const dbExperts = (allExperts ?? []) as unknown as ExpertPick[];
+      // Filter out Kalshi fallback noise when real picks exist
+      const realFromDb = dbExperts.filter(p => p.source !== 'Robinhood/Kalshi');
+      const typedExperts = realFromDb.length > 0 ? realFromDb : dbExperts;
+      // Also directly scrape ESPN insider news + RotoWire for freshest injury intel
+      // (these might not be in DB yet if this is the first run)
+      try {
+        const { fetchSocialPicks } = await import('@/lib/scrapers/social');
+        for (const sport of ['nba', 'mlb'] as const) {
+          const freshPicks = await fetchSocialPicks(sport);
+          const freshInjuryIntel = freshPicks.filter(p => p.pick_type === 'injury_intel');
+          // Add fresh injury intel directly — these are breaking news
+          for (const pick of freshInjuryIntel) {
+            if (!typedExperts.some(e => e.pick_description === pick.pick_description)) {
+              typedExperts.push(pick);
+            }
+          }
+        }
+      } catch { /* ok */ }
 
       // Event teams
       const { data: eventsData } = await supabase.from('events').select('id, home_team, away_team');
@@ -247,7 +269,16 @@ export async function GET(request: Request) {
         }
       } catch { /* ok */ }
 
-      // NBA stats: only fetch for teams not already covered (max 10 API calls)
+      // NBA stats: try free ESPN standings first (covers all teams in one call).
+      // Fall back to balldontlie for per-team recent form when API key is set.
+      try {
+        const espnStandings = await fetchNbaStandingsEspn();
+        for (const teamName of uniqueTeams) {
+          if (teamStats.has(teamName)) continue;
+          const hit = espnStandings.get(teamName);
+          if (hit) teamStats.set(teamName, hit);
+        }
+      } catch { /* ok */ }
       let nbaCallCount = 0;
       for (const teamName of uniqueTeams) {
         if (teamStats.has(teamName) || nbaCallCount >= 10) continue;
@@ -292,7 +323,10 @@ export async function GET(request: Request) {
       const injurySignals: InjurySignal[] = [];
 
       // Fetch injury reports
-      const allInjuryReports = await fetchAllInjuries();
+      let allInjuryReports: Awaited<ReturnType<typeof fetchAllInjuries>> = [];
+      try {
+        allInjuryReports = await fetchAllInjuries();
+      } catch { /* ok */ }
       const injuryMap = new Map<string, { impact: string; star_out_count: number; total_out_count: number; description: string }>();
       for (const report of allInjuryReports) {
         injuryMap.set(report.team_name, {
@@ -302,12 +336,30 @@ export async function GET(request: Request) {
           description: report.description,
         });
       }
+      (summary as Record<string, unknown>).injuryTeamsFound = allInjuryReports.length;
 
       // Batch fetch all events with sport_key for advanced signals
       const { data: allEventsForSignals } = await supabase.from('events').select('id, commence_time, sport_key, home_team, away_team, completed, scores').limit(200);
       const eventsMap = new Map<string, { commence_time: string; sport_key: string; completed: boolean }>();
       const allEventsList = allEventsForSignals ?? [];
       for (const e of allEventsList) eventsMap.set(e.id, { commence_time: e.commence_time, sport_key: e.sport_key, completed: e.completed });
+
+      // Batch fetch CLV snapshots for ALL events at once (avoid N+1)
+      const eventIdsForClv = [...eventTeams.keys()];
+      const clvSnapsByEvent = new Map<string, Array<{ outcomes: unknown; fetched_at: string }>>();
+      if (eventIdsForClv.length > 0) {
+        const { data: batchSnaps } = await supabase.from('odds_snapshots')
+          .select('event_id, outcomes, fetched_at, market_key')
+          .in('event_id', eventIdsForClv)
+          .eq('market_key', 'h2h')
+          .order('fetched_at', { ascending: true });
+        for (const s of (batchSnaps ?? []) as Array<Record<string, unknown>>) {
+          const eid = s.event_id as string;
+          const list = clvSnapsByEvent.get(eid) ?? [];
+          list.push({ outcomes: s.outcomes, fetched_at: s.fetched_at as string });
+          clvSnapsByEvent.set(eid, list);
+        }
+      }
 
       for (const [eventId, teams] of eventTeams) {
         const ev = eventsMap.get(eventId);
@@ -358,29 +410,51 @@ export async function GET(request: Request) {
           }
         }
 
-        // Playoff motivation
+        // Playoff motivation — derive real games remaining from season end date + sport
+        // NBA regular season ends ~April 15, MLB ends ~October 1 (approximate)
+        const gameDate = new Date(ev.commence_time);
+        let gamesRemaining: number;
+        if (ev.sport_key === 'basketball_nba') {
+          // NBA: ~82 games over ~170 days → ~0.48 games/day
+          const seasonEnd = new Date(gameDate.getFullYear(), 3, 15); // April 15
+          if (gameDate > seasonEnd) seasonEnd.setFullYear(seasonEnd.getFullYear() + 1);
+          const daysLeft = Math.max(0, Math.ceil((seasonEnd.getTime() - gameDate.getTime()) / (1000 * 60 * 60 * 24)));
+          gamesRemaining = Math.round(daysLeft * 0.48);
+        } else if (ev.sport_key === 'baseball_mlb') {
+          // MLB: ~162 games over ~180 days → ~0.90 games/day
+          const seasonEnd = new Date(gameDate.getFullYear(), 8, 30); // Sept 30
+          if (gameDate > seasonEnd) seasonEnd.setFullYear(seasonEnd.getFullYear() + 1);
+          const daysLeft = Math.max(0, Math.ceil((seasonEnd.getTime() - gameDate.getTime()) / (1000 * 60 * 60 * 24)));
+          gamesRemaining = Math.round(daysLeft * 0.90);
+        } else {
+          gamesRemaining = 10;
+        }
         for (const teamName of [teams.home_team, teams.away_team]) {
           const stats = teamStats.get(teamName);
           if (stats) {
-            playoffSignals.push(computePlayoffMotivation(eventId, teamName, stats.win_pct, 10, stats.win_pct > 0.5));
+            playoffSignals.push(computePlayoffMotivation(eventId, teamName, stats.win_pct, gamesRemaining, stats.win_pct > 0.5));
           }
         }
 
-        // CLV - check line movement for this event
-        const { data: eventSnaps } = await supabase.from('odds_snapshots').select('outcomes, fetched_at, market_key')
-          .eq('event_id', eventId).eq('market_key', 'h2h').order('fetched_at', { ascending: true }).limit(10);
+        // CLV - use batched snapshots
+        const eventSnaps = clvSnapsByEvent.get(eventId);
         if (eventSnaps && eventSnaps.length >= 2) {
+          const trimmed = eventSnaps.slice(0, 10);
           for (const teamName of [teams.home_team, teams.away_team]) {
-            const teamOdds = eventSnaps.map((s) => {
+            const teamOdds = trimmed.map((s) => {
               const outcomes = s.outcomes as Array<{ name: string; price: number }>;
               const o = outcomes.find((x) => x.name === teamName);
-              return o ? { odds: o.price, fetched_at: s.fetched_at as string } : null;
+              return o ? { odds: o.price, fetched_at: s.fetched_at } : null;
             }).filter((x): x is { odds: number; fetched_at: string } => x !== null);
             const clv = computeCLV(eventId, 'h2h', teamName, teamOdds);
             if (clv) clvSignals.push(clv);
           }
         }
       }
+
+      // Count injury intel from ALL sources (insiders, ESPN News, RotoWire)
+      const insiderInjuryPicks = typedExperts.filter(p => p.pick_type === 'injury_intel');
+      const insiderPicks = typedExperts.filter(p => p.source === 'Insider/X' || p.source === 'ESPN News' || p.source === 'RotoWire');
 
       summary.advancedSignals = {
         fatigue: fatigueSignals.filter((f) => f.advantage !== 'neutral').length,
@@ -392,6 +466,18 @@ export async function GET(request: Request) {
         playoff: playoffSignals.filter((p) => p.motivation !== 'medium').length,
         injuries: injurySignals.filter((i) => i.advantage !== 'neutral').length,
       };
+      (summary as Record<string, unknown>).insiderPicks = insiderPicks.length;
+      (summary as Record<string, unknown>).insiderInjuryIntel = insiderInjuryPicks.length;
+      // Cross-validate: insider injury reports vs ESPN confirmed
+      if (insiderInjuryPicks.length > 0) {
+        const espnTeams = new Set(allInjuryReports.filter(r => r.impact !== 'none').map(r => r.team_name.toLowerCase()));
+        const validated = insiderInjuryPicks.filter(p => {
+          const desc = p.pick_description.toLowerCase();
+          return [...espnTeams].some(t => t.split(' ').some(w => w.length > 3 && desc.includes(w)));
+        });
+        (summary as Record<string, unknown>).insiderConfirmedByEspn = validated.length;
+        (summary as Record<string, unknown>).insiderPendingConfirm = insiderInjuryPicks.length - validated.length;
+      }
 
       // ═══ PHASE 3: CORRELATION ENGINE (with learned config) ═══
       if (learnedConfig) {
@@ -403,14 +489,29 @@ export async function GET(request: Request) {
         };
       }
 
-      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, fatigue: fatigueSignals, homeAway: homeAwaySignals, pace: paceSignals, altitude: altitudeSignals, clv: clvSignals, streaks: streakSignals, playoff: playoffSignals, injuries: injurySignals, eventTeams } as EngineInput, learnedConfig);
+      // Build best-odds lookup: for every (event, market, outcome), find the best price across bookmakers.
+      // This lets data/crowd signals (STATS, PACE, INJURY, etc.) attach real odds even when they
+      // don't know the price themselves — otherwise those candidates get dropped as odds===0.
+      const bestOddsByKey = new Map<string, { odds: number; bookmaker: string }>();
+      for (const row of typedOdds) {
+        for (const outcome of row.outcomes) {
+          const k = `${row.event_id}|${row.market_key}|${outcome.name}`;
+          const existing = bestOddsByKey.get(k);
+          // "Best for bettor" = highest American odds (highest positive, least negative).
+          if (!existing || outcome.price > existing.odds) {
+            bestOddsByKey.set(k, { odds: outcome.price, bookmaker: row.bookmaker_key });
+          }
+        }
+      }
+
+      const engineRecs = generateRecommendations({ arbs, evs, expertPicks: typedExperts, lineMovements, steamMoves, consensus: allConsensus, discrepancies, parlays, kalshiContracts, teamStats, weather: weatherMap, polymarket: polyContracts, fatigue: fatigueSignals, homeAway: homeAwaySignals, pace: paceSignals, altitude: altitudeSignals, clv: clvSignals, streaks: streakSignals, playoff: playoffSignals, injuries: injurySignals, eventTeams, bestOddsByKey } as EngineInput, learnedConfig);
       summary.engineSignals = { arbs: arbs.length, evs: evs.length, experts: typedExperts.length, lineMovements: lineMovements.length, steamMoves: steamMoves.length, consensus: allConsensus.length, discrepancies: discrepancies.length, parlays: parlays.length, robinhood: kalshiContracts.length };
 
       if (engineRecs.length > 0) {
         await supabase.from('recommendations').delete().lt('valid_until', new Date().toISOString());
         await supabase.from('recommendations').insert(
           engineRecs.filter((r) => r.event_id).map((r) => ({
-            event_id: r.event_id, type: r.type === 'steam' || r.type === 'expert' ? 'value' : r.type,
+            event_id: r.event_id, type: r.type,
             market_key: r.market_key, outcome_name: r.outcome_name, bookmaker_key: r.bookmaker_key,
             odds: r.odds, reasoning: r.reasoning, confidence_score: r.confidence_score, valid_until: r.valid_until,
           }))
@@ -588,6 +689,30 @@ export async function GET(request: Request) {
     const { data: pending } = await supabase.from('simulated_bets').select('*, events(completed, scores, home_team, away_team)').eq('result', 'pending');
     if (pending) {
       let settled = 0;
+
+      // Batch load latest totals/spreads snapshots once per event that needs them
+      const needsSnapEventIds = [...new Set(pending
+        .filter((b) => b.market_key === 'totals' || b.market_key === 'spreads')
+        .map((b) => b.event_id as string))];
+      const latestTotalsByEvent = new Map<string, Array<{ point?: number }>>();
+      const latestSpreadsByEvent = new Map<string, Array<{ name: string; point?: number }>>();
+      if (needsSnapEventIds.length > 0) {
+        const { data: snapRows } = await supabase.from('odds_snapshots')
+          .select('event_id, market_key, outcomes, fetched_at')
+          .in('event_id', needsSnapEventIds)
+          .in('market_key', ['totals', 'spreads'])
+          .order('fetched_at', { ascending: false });
+        for (const row of (snapRows ?? []) as Array<Record<string, unknown>>) {
+          const eid = row.event_id as string;
+          const mk = row.market_key as string;
+          if (mk === 'totals' && !latestTotalsByEvent.has(eid)) {
+            latestTotalsByEvent.set(eid, row.outcomes as Array<{ point?: number }>);
+          } else if (mk === 'spreads' && !latestSpreadsByEvent.has(eid)) {
+            latestSpreadsByEvent.set(eid, row.outcomes as Array<{ name: string; point?: number }>);
+          }
+        }
+      }
+
       for (const bet of pending) {
         const ev = (bet as Record<string, unknown>).events as { completed: boolean; scores: { home: number; away: number } | null; home_team: string; away_team: string } | null;
         if (!ev?.completed || !ev.scores) continue;
@@ -595,11 +720,11 @@ export async function GET(request: Request) {
         const { home, away } = ev.scores;
         if (bet.market_key === 'h2h') { won = bet.outcome_name === ev.home_team ? home > away : away > home; }
         else if (bet.market_key === 'totals') {
-          const { data: snap } = await supabase.from('odds_snapshots').select('outcomes').eq('event_id', bet.event_id).eq('market_key', 'totals').order('fetched_at', { ascending: false }).limit(1);
-          if (snap?.[0]) { const line = (snap[0].outcomes as Array<{ point?: number }>)[0]?.point ?? 0; won = bet.outcome_name === 'Over' ? home + away > line : home + away < line; if (home + away === line) won = null; }
+          const outcomes = latestTotalsByEvent.get(bet.event_id as string);
+          if (outcomes) { const line = outcomes[0]?.point ?? 0; won = bet.outcome_name === 'Over' ? home + away > line : home + away < line; if (home + away === line) won = null; }
         } else if (bet.market_key === 'spreads') {
-          const { data: snap } = await supabase.from('odds_snapshots').select('outcomes').eq('event_id', bet.event_id).eq('market_key', 'spreads').order('fetched_at', { ascending: false }).limit(1);
-          if (snap?.[0]) { const o = (snap[0].outcomes as Array<{ name: string; point?: number }>).find((x) => x.name === bet.outcome_name); if (o?.point != null) { const isHome = bet.outcome_name === ev.home_team; const adj = (isHome ? home : away) + o.point; won = adj > (isHome ? away : home); if (adj === (isHome ? away : home)) won = null; } }
+          const outcomes = latestSpreadsByEvent.get(bet.event_id as string);
+          if (outcomes) { const o = outcomes.find((x) => x.name === bet.outcome_name); if (o?.point != null) { const isHome = bet.outcome_name === ev.home_team; const adj = (isHome ? home : away) + o.point; won = adj > (isHome ? away : home); if (adj === (isHome ? away : home)) won = null; } }
         }
         if (won !== null) {
           const dec = bet.odds > 0 ? bet.odds / 100 : 100 / Math.abs(bet.odds);

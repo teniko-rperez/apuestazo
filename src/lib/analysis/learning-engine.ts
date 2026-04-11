@@ -66,7 +66,6 @@ function analyzeLosses(bets: BetData[]): { analysis: LossAnalysis[]; patterns: s
 
   // Track loss patterns
   let underdogLosses = 0;
-  let favoriteLosses = 0;
   let lowSignalLosses = 0;
   let singleCatLosses = 0;
   const signalLossCounts: Record<string, number> = {};
@@ -84,7 +83,6 @@ function analyzeLosses(bets: BetData[]): { analysis: LossAnalysis[]; patterns: s
     const isHome = bet.outcome_name === bet.home_team;
 
     if (isUnderdog) underdogLosses++;
-    if (isFavorite) favoriteLosses++;
     if (signalCount <= 2) lowSignalLosses++;
     if (catCount <= 1) singleCatLosses++;
 

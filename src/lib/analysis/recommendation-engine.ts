@@ -13,7 +13,7 @@
  * 8. Robinhood/Kalshi prediction market prices
  */
 
-import { americanToDecimal, americanToImplied, formatOdds, formatPct } from './implied-probability';
+import { americanToImplied, formatOdds, formatPct } from './implied-probability';
 import type { LearnedConfig } from './learning-engine';
 import type { ArbResult } from './arbitrage';
 import type { EvResult } from './expected-value';
@@ -21,7 +21,6 @@ import type { LineMovement, SteamMove } from './line-movement';
 import type { ParlayCombo } from './parlay-builder';
 import type { ExpertPick } from '@/lib/scrapers/experts';
 import type { KalshiContract } from '@/lib/scrapers/kalshi';
-import type { NbaTeamStats, MlbTeamStats } from '@/lib/scrapers/stats';
 import type { WeatherData } from '@/lib/scrapers/weather';
 import type { PolyContract } from '@/lib/scrapers/polymarket';
 import type { FatigueSignal, HomeAwaySignal, PaceSignal, AltitudeSignal, CLVSignal, StreakSignal, PlayoffSignal, InjurySignal } from './advanced-signals';
@@ -65,6 +64,12 @@ export interface EngineInput {
   playoff: PlayoffSignal[];
   injuries: InjurySignal[];
   eventTeams: Map<string, { home_team: string; away_team: string }>;
+  /**
+   * Best odds per (event, market, outcome) across all bookmakers.
+   * Used as a fallback when a signal fires for an outcome without knowing the price.
+   * Key format: `${event_id}|${market_key}|${outcome_name}`
+   */
+  bestOddsByKey?: Map<string, { odds: number; bookmaker: string }>;
 }
 
 export interface ScoredRecommendation {
@@ -113,13 +118,26 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
     reason: string
   ) {
     const key = getKey(eventId, marketKey, outcomeName);
+
+    // Fallback: if the signal doesn't carry real odds, look them up from the
+    // best-odds map so data/crowd signals can produce viable candidates.
+    let effectiveOdds = odds;
+    let effectiveBookmaker = bookmakerKey;
+    if (effectiveOdds === 0 && input.bestOddsByKey) {
+      const lookup = input.bestOddsByKey.get(key);
+      if (lookup) {
+        effectiveOdds = lookup.odds;
+        effectiveBookmaker = lookup.bookmaker;
+      }
+    }
+
     if (!candidates.has(key)) {
       candidates.set(key, {
         event_id: eventId,
         market_key: marketKey,
         outcome_name: outcomeName,
-        bookmaker_key: bookmakerKey,
-        odds,
+        bookmaker_key: effectiveBookmaker,
+        odds: effectiveOdds,
         signals: [],
         scores: [],
         reasonParts: [],
@@ -129,34 +147,58 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
     c.signals.push(signalName);
     c.scores.push(score);
     c.reasonParts.push(reason);
-    // Keep best odds
-    if (Math.abs(odds) > 0 && (c.odds === 0 || odds > c.odds)) {
-      c.odds = odds;
-      c.bookmaker_key = bookmakerKey;
+    // Upgrade to better odds if provided
+    if (Math.abs(effectiveOdds) > 0 && (c.odds === 0 || effectiveOdds > c.odds)) {
+      c.odds = effectiveOdds;
+      c.bookmaker_key = effectiveBookmaker;
     }
   }
 
   // ─── Signal 1: FAVORITO (highest-odds favorite per event) ───
   // For each event, identify the favorite (lowest/most negative odds = biggest favorite)
-  // and give it a massive weight so the engine always prioritizes favorites
+  // and give it a massive weight so the engine always prioritizes favorites.
+  // Prefer bestOddsByKey (covers every event with odds) over evs (which only
+  // contains +EV outcomes and misses games without positive edge).
   {
     const eventFavorites = new Map<string, { event_id: string; outcome_name: string; bookmaker_key: string; odds: number; impliedProb: number }>();
-    // Scan all h2h odds to find the favorite per event
-    for (const ev of input.evs) {
-      if (ev.market_key !== 'h2h') continue;
-      const implied = americanToImplied(ev.odds);
-      const existing = eventFavorites.get(ev.event_id);
-      if (!existing || implied > existing.impliedProb) {
-        eventFavorites.set(ev.event_id, {
-          event_id: ev.event_id,
-          outcome_name: ev.outcome_name,
-          bookmaker_key: ev.bookmaker_key,
-          odds: ev.odds,
-          impliedProb: implied,
-        });
+
+    if (input.bestOddsByKey && input.bestOddsByKey.size > 0) {
+      for (const [eventId, teams] of input.eventTeams) {
+        for (const teamName of [teams.home_team, teams.away_team]) {
+          const key = `${eventId}|h2h|${teamName}`;
+          const o = input.bestOddsByKey.get(key);
+          if (!o || o.odds === 0) continue;
+          const implied = americanToImplied(o.odds);
+          const existing = eventFavorites.get(eventId);
+          if (!existing || implied > existing.impliedProb) {
+            eventFavorites.set(eventId, {
+              event_id: eventId,
+              outcome_name: teamName,
+              bookmaker_key: o.bookmaker,
+              odds: o.odds,
+              impliedProb: implied,
+            });
+          }
+        }
+      }
+    } else {
+      // Fallback: derive from +EV list (legacy path, misses games with no +EV)
+      for (const ev of input.evs) {
+        if (ev.market_key !== 'h2h') continue;
+        const implied = americanToImplied(ev.odds);
+        const existing = eventFavorites.get(ev.event_id);
+        if (!existing || implied > existing.impliedProb) {
+          eventFavorites.set(ev.event_id, {
+            event_id: ev.event_id,
+            outcome_name: ev.outcome_name,
+            bookmaker_key: ev.bookmaker_key,
+            odds: ev.odds,
+            impliedProb: implied,
+          });
+        }
       }
     }
-    // Also scan from eventTeams + any h2h odds data we can infer
+
     // The favorite signal is the core signal - 0.50 weight minimum
     for (const [, fav] of eventFavorites) {
       const prob = fav.impliedProb;
@@ -229,6 +271,8 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
   // ─── Signal 5: Expert Consensus ───
   // Group expert picks by team/outcome mentioned
   const expertByTeam = new Map<string, { count: number; totalConf: number; sources: string[] }>();
+  // Track insider injury intel separately — these are high-weight breaking news
+  const insiderInjuryByTeam = new Map<string, { reports: string[]; sources: string[]; espnConfirmed: boolean }>();
 
   for (const pick of input.expertPicks) {
     const desc = pick.pick_description.toLowerCase();
@@ -236,7 +280,6 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
     for (const [eventId, teams] of input.eventTeams) {
       const homeLC = teams.home_team.toLowerCase();
       const awayLC = teams.away_team.toLowerCase();
-      // Check if pick mentions either team
       const homeWords = homeLC.split(' ');
       const awayWords = awayLC.split(' ');
       const matchesHome = homeWords.some((w) => w.length > 3 && desc.includes(w));
@@ -244,12 +287,27 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
 
       if (matchesHome || matchesAway) {
         const teamName = matchesHome ? teams.home_team : teams.away_team;
-        const key = `${eventId}|${teamName}`;
-        const existing = expertByTeam.get(key) ?? { count: 0, totalConf: 0, sources: [] };
-        existing.count++;
-        existing.totalConf += pick.confidence === 'alta' ? 3 : pick.confidence === 'media' ? 2 : 1;
-        existing.sources.push(pick.source);
-        expertByTeam.set(key, existing);
+
+        // Separate injury intel from regular expert picks
+        if (pick.pick_type === 'injury_intel') {
+          const key = `${eventId}|${teamName}`;
+          const existing = insiderInjuryByTeam.get(key) ?? { reports: [], sources: [], espnConfirmed: false };
+          existing.reports.push(pick.pick_description.slice(0, 100));
+          existing.sources.push(pick.expert_name);
+          // Check if ESPN injury data already confirms this
+          const hasEspnInjury = input.injuries.some(
+            inj => inj.team_name === teamName && inj.team_impact !== 'none'
+          );
+          if (hasEspnInjury) existing.espnConfirmed = true;
+          insiderInjuryByTeam.set(key, existing);
+        } else {
+          const key = `${eventId}|${teamName}`;
+          const existing = expertByTeam.get(key) ?? { count: 0, totalConf: 0, sources: [] };
+          existing.count++;
+          existing.totalConf += pick.confidence === 'alta' ? 3 : pick.confidence === 'media' ? 2 : 1;
+          existing.sources.push(pick.source);
+          expertByTeam.set(key, existing);
+        }
       }
     }
   }
@@ -257,20 +315,45 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
   for (const [key, data] of expertByTeam) {
     const [eventId, teamName] = key.split('|');
     if (data.count >= 2) {
-      // Multiple experts agree = strong signal
       const score = data.count >= 3 ? 0.22 : 0.15;
       const uniqueSources = [...new Set(data.sources)];
       addSignal(
         eventId,
         'h2h',
         teamName,
-        'draftkings', // default book
+        'draftkings',
         0,
         'EXPERT',
         score,
         `${data.count} expertos coinciden (${uniqueSources.join(', ')})`
       );
     }
+  }
+
+  // ─── Signal 5b: Insider Injury Intel (breaking news from verified insiders) ───
+  // When Shams/Passan etc. report a player is OUT before ESPN updates, this is edge
+  for (const [key, data] of insiderInjuryByTeam) {
+    const [eventId, hurtTeam] = key.split('|');
+    const teams = input.eventTeams.get(eventId);
+    if (!teams) continue;
+
+    const opponent = hurtTeam === teams.home_team ? teams.away_team : teams.home_team;
+    const uniqueSources = [...new Set(data.sources)];
+    // Higher score if ESPN confirms, still significant if insider-only (breaking news edge)
+    const score = data.espnConfirmed ? 0.55 : 0.40;
+    const confirmTag = data.espnConfirmed ? ' [CONFIRMADO ESPN]' : ' [INSIDER - pendiente confirmar]';
+
+    // Bet AGAINST the hurt team (for the opponent)
+    addSignal(
+      eventId,
+      'h2h',
+      opponent,
+      'draftkings',
+      0,
+      'INJURY',
+      score,
+      `Intel insider: ${hurtTeam} con jugador(es) fuera. ${uniqueSources.join(', ')}.${confirmTag} ${data.reports[0]}`
+    );
   }
 
   // ─── Signal 6: Odds Discrepancies ───
@@ -579,6 +662,8 @@ export function generateRecommendations(input: EngineInput, learnedConfig?: Lear
   const minOdds = learnedConfig?.min_odds ?? -800;
 
   for (const [, c] of candidates) {
+    // Skip candidates that never got real odds attached (signal-only, e.g. steam without price)
+    if (c.odds === 0) continue;
     // Skip if odds out of learned range
     if (c.odds > 0 && c.odds > maxOdds) continue;
     if (c.odds < 0 && c.odds < minOdds) continue;
