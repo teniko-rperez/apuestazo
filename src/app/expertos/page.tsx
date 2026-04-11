@@ -43,45 +43,56 @@ const SOURCE_COLORS: Record<string, { bg: string; text: string; border: string }
 };
 
 function PickCard({ pick }: { pick: ExpertPick }) {
+  const [open, setOpen] = useState(false);
   const confScore = pick.confidence === "alta" ? 0.85 : pick.confidence === "media" ? 0.7 : 0.5;
   const colors = SOURCE_COLORS[pick.source] ?? { bg: "bg-gray-50", text: "text-gray-600", border: "border-gray-200" };
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 card-hover">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-[14px] font-bold text-gray-900">{pick.expert_name}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className={`text-[10px] font-bold ${colors.text} ${colors.bg} border ${colors.border} px-2 py-0.5 rounded-md`}>
-              {pick.source}
-            </span>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 card-hover overflow-hidden">
+      <div className="p-4 cursor-pointer" onClick={() => setOpen(!open)}>
+        <div className="flex items-center justify-between mb-2">
+          <span className={`text-[10px] font-bold ${colors.text} ${colors.bg} border ${colors.border} px-2 py-0.5 rounded-md`}>
+            {pick.source}
+          </span>
+          <svg className={`w-4 h-4 text-gray-300 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+        <p className="text-[13px] text-gray-600 mb-2">{pick.expert_name}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-gray-400 font-medium uppercase">Pick:</p>
+          <p className="text-[15px] font-bold text-gray-900 line-clamp-1">{pick.pick_description}</p>
+        </div>
+      </div>
+
+      {open && (
+        <div className="px-4 pb-4 border-t border-gray-50 bg-gray-50/50">
+          <div className="flex items-center justify-between mt-3 mb-3">
             <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase">
               {pick.sport}
             </span>
+            <ConfidenceMeter score={confScore} />
+          </div>
+          <p className="text-[13px] text-gray-700 leading-relaxed mb-3">{pick.pick_description}</p>
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-gray-400 font-medium">Record: {pick.record}</span>
+            {pick.profit_units != null && (
+              <span className={`font-bold font-mono ${pick.profit_units > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                {pick.profit_units > 0 ? "+" : ""}{pick.profit_units} u
+              </span>
+            )}
+            {pick.source_url && (
+              <a href={pick.source_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1">
+                Ver fuente
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+              </a>
+            )}
           </div>
         </div>
-        <ConfidenceMeter score={confScore} />
-      </div>
-
-      <p className="text-[13px] text-gray-700 leading-relaxed mb-3">{pick.pick_description}</p>
-
-      <div className="flex items-center justify-between text-[11px] pt-2 border-t border-gray-50">
-        <span className="text-gray-400 font-medium">Record: {pick.record}</span>
-        {pick.profit_units != null && (
-          <span className={`font-bold font-mono ${pick.profit_units > 0 ? "text-emerald-600" : "text-red-500"}`}>
-            {pick.profit_units > 0 ? "+" : ""}{pick.profit_units} u
-          </span>
-        )}
-        {pick.source_url && (
-          <a href={pick.source_url} target="_blank" rel="noopener noreferrer"
-            className="text-orange-500 font-semibold hover:text-orange-600 flex items-center gap-1">
-            Ver fuente
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-            </svg>
-          </a>
-        )}
-      </div>
+      )}
     </div>
   );
 }

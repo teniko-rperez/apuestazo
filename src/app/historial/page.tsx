@@ -39,6 +39,62 @@ function useHistory() {
   });
 }
 
+function HistRow({ bet }: { bet: HistBet }) {
+  const [open, setOpen] = useState(false);
+  const isFavorite = bet.odds < 0;
+  const statusConfig = bet.result === "won"
+    ? { bg: "bg-emerald-50", text: "text-emerald-700", label: "GANADA", dot: "bg-emerald-500", border: "border-l-emerald-500" }
+    : bet.result === "lost"
+    ? { bg: "bg-red-50", text: "text-red-600", label: "PERDIDA", dot: "bg-red-500", border: "border-l-red-500" }
+    : { bg: "bg-amber-50", text: "text-amber-700", label: "EMPATE", dot: "bg-amber-500", border: "border-l-amber-400" };
+
+  return (
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 ${statusConfig.border} card-hover overflow-hidden`}>
+      <div className="p-3 cursor-pointer" onClick={() => setOpen(!open)}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
+            <span className={`text-[11px] font-bold ${statusConfig.text} ${statusConfig.bg} px-2 py-0.5 rounded-md`}>
+              {statusConfig.label}
+            </span>
+          </div>
+          <svg className={`w-4 h-4 text-gray-300 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+        <p className="text-[12px] text-gray-600 mb-1.5">{bet.events ? `${bet.events.away_team} vs ${bet.events.home_team}` : ""}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-gray-400 font-medium uppercase">Ganador:</p>
+          <p className="text-[15px] font-bold text-gray-900">{bet.outcome_name}</p>
+          {isFavorite && (
+            <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">FAV</span>
+          )}
+        </div>
+      </div>
+      {open && (
+        <div className="px-3 pb-3 border-t border-gray-50 bg-gray-50/50">
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-[11px] text-gray-500">Odds</p>
+            <p className="text-[13px] font-extrabold font-mono text-orange-500">{formatOdds(bet.odds)}</p>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-[11px] text-gray-500">Profit</p>
+            <p className={`text-[13px] font-extrabold font-mono ${(bet.profit ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+              {(bet.profit ?? 0) >= 0 ? "+" : ""}${(bet.profit ?? 0).toFixed(0)}
+            </p>
+          </div>
+          {bet.events?.scores && (
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-[11px] text-gray-500">Score</p>
+              <p className="text-[12px] text-gray-600 font-mono">{bet.events.scores.away} - {bet.events.scores.home}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function calcStats(bets: HistBet[]) {
   const won = bets.filter((b) => b.result === "won").length;
   const lost = bets.filter((b) => b.result === "lost").length;
@@ -156,30 +212,7 @@ export default function HistorialPage() {
                   </span>
                 </div>
                 <div className="space-y-2">
-                  {dateBets.map((b) => {
-                    const dotColor = b.result === "won" ? "bg-emerald-500" : b.result === "lost" ? "bg-red-500" : "bg-amber-500";
-                    const border = b.result === "won" ? "border-l-emerald-500" : b.result === "lost" ? "border-l-red-500" : "border-l-amber-400";
-                    return (
-                      <div key={b.id} className={`bg-white rounded-2xl p-3 shadow-sm border border-gray-100 border-l-4 ${border} flex items-center gap-3 card-hover`}>
-                        <span className={`w-2 h-2 rounded-full ${dotColor} shrink-0`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] text-gray-400 truncate">
-                            {b.events ? `${b.events.away_team} @ ${b.events.home_team}` : ""}
-                          </p>
-                          <p className="text-[13px] font-bold text-gray-900 truncate">{b.outcome_name}</p>
-                        </div>
-                        <div className="text-right shrink-0 space-y-0.5">
-                          <p className="text-[13px] font-extrabold font-mono text-orange-500">{formatOdds(b.odds)}</p>
-                          <p className={`text-[12px] font-extrabold font-mono ${(b.profit ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                            {(b.profit ?? 0) >= 0 ? "+" : ""}${(b.profit ?? 0).toFixed(0)}
-                          </p>
-                          {b.events?.scores && (
-                            <p className="text-[10px] text-gray-400 font-mono">{b.events.scores.away}-{b.events.scores.home}</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {dateBets.map((b) => <HistRow key={b.id} bet={b} />)}
                 </div>
               </div>
             );

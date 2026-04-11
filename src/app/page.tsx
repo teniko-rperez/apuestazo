@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecommendations } from "@/hooks/use-recommendations";
@@ -26,6 +27,7 @@ function StatCard({ label, value, sub, color, icon }: { label: string; value: st
 
 /* ─── Rec Card ─── */
 function RecCard({ rec }: { rec: Record<string, unknown> }) {
+  const [open, setOpen] = useState(false);
   const ev = rec.events as { home_team: string; away_team: string; sport_key?: string; commence_time?: string } | null;
   const conf = rec.confidence_score as number;
   const odds = rec.odds as number;
@@ -37,108 +39,136 @@ function RecCard({ rec }: { rec: Record<string, unknown> }) {
   const time = ev?.commence_time
     ? `${new Date(ev.commence_time).toLocaleDateString("es-PR", { month: "short", day: "numeric" })} ${new Date(ev.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" })}`
     : "";
+  const isFavorite = odds < 0;
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 card-hover group">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 card-hover overflow-hidden">
+      <div className="p-4 cursor-pointer" onClick={() => setOpen(!open)}>
+        <div className="flex items-center justify-between mb-3">
           {sport && (
             <span className={`text-[10px] font-black text-white px-2 py-0.5 rounded-md bg-gradient-to-r ${sportColor}`}>
               {sport}
             </span>
           )}
-          {isSafe && (
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-              MAS SEGURA
-            </span>
-          )}
-          {isSecure && (
-            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-              SEGURA
+          <svg className={`w-4 h-4 text-gray-300 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+
+        <p className="text-[13px] text-gray-600 mb-2">
+          {ev ? `${ev.away_team} vs ${ev.home_team}` : ""}
+        </p>
+
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-gray-400 font-medium uppercase">Ganador:</p>
+          <p className="text-[16px] font-bold text-gray-900">{rec.outcome_name as string}</p>
+          {isFavorite && (
+            <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">
+              FAV
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center">
-            <span className="text-[11px] font-black text-orange-600">{Math.round(conf * 100)}%</span>
+      </div>
+
+      {open && (
+        <div className="px-4 pb-4 border-t border-gray-50 bg-gray-50/50">
+          <div className="flex items-center justify-between mt-3 mb-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isSafe && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">MAS SEGURA</span>}
+              {isSecure && <span className="text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">SEGURA</span>}
+              {ev && (rec.outcome_name as string) === ev.home_team && <span className="text-[9px] text-blue-500 font-semibold">HOME</span>}
+            </div>
+            <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center">
+              <span className="text-[11px] font-black text-orange-600">{Math.round(conf * 100)}%</span>
+            </div>
+          </div>
+
+          {time && <p className="text-[10px] text-gray-400 mb-2">{time}</p>}
+
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] text-gray-500">Odds</p>
+            <div className="text-right">
+              <p className="text-lg font-extrabold text-orange-500 font-mono">{formatOdds(odds)}</p>
+              {odds !== 0 && <p className="text-[10px] text-gray-400">{explainOdds(odds, 50)}</p>}
+            </div>
           </div>
         </div>
-      </div>
-
-      <p className="text-[12px] text-gray-500 mb-1">
-        {ev ? `${ev.away_team} vs ${ev.home_team}` : ""}
-        {ev && <span className="text-blue-500 font-semibold ml-1">({ev.home_team} HOME)</span>}
-        {ev && odds < 0 && (rec.outcome_name as string) && (
-          <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded ml-1.5">
-            {rec.outcome_name as string} FAV
-          </span>
-        )}
-      </p>
-      {time && <p className="text-[10px] text-gray-400 mb-2">{time}</p>}
-
-      <div className="flex items-center justify-between pt-2 border-t border-gray-50">
-        <div>
-          <p className="text-[10px] text-gray-400 font-medium">Ganador</p>
-          <p className="text-[15px] font-bold text-gray-900">{rec.outcome_name as string}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xl font-extrabold text-orange-500 font-mono">{formatOdds(odds)}</p>
-          {odds !== 0 && <p className="text-[10px] text-gray-400">{explainOdds(odds, 50)}</p>}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
 /* ─── Sim Row ─── */
 function SimRow({ bet }: { bet: Record<string, unknown> }) {
+  const [open, setOpen] = useState(false);
   const result = bet.result as string;
   const profit = bet.profit as number | null;
   const odds = bet.odds as number;
   const ev = bet.events as { home_team: string; away_team: string; commence_time?: string; scores?: { home: number; away: number } | null } | null;
   const isCancelled = result === "cancelled" || result === "push" && (bet.reasoning as string)?.includes("CANCELADA");
+  const isFavorite = odds < 0;
 
   const statusConfig = isCancelled
-    ? { bg: "bg-gray-100", text: "text-gray-500", label: "CANCELADA", dot: "bg-gray-400" }
+    ? { bg: "bg-gray-50", text: "text-gray-500", label: "CANCELADA", dot: "bg-gray-400", border: "border-l-gray-300" }
     : result === "won"
-    ? { bg: "bg-emerald-50", text: "text-emerald-700", label: "GANADA", dot: "bg-emerald-500" }
+    ? { bg: "bg-emerald-50", text: "text-emerald-700", label: "GANADA", dot: "bg-emerald-500", border: "border-l-emerald-500" }
     : result === "lost"
-    ? { bg: "bg-red-50", text: "text-red-600", label: "PERDIDA", dot: "bg-red-500" }
-    : { bg: "bg-blue-50", text: "text-blue-600", label: "PENDIENTE", dot: "bg-blue-500" };
+    ? { bg: "bg-red-50", text: "text-red-600", label: "PERDIDA", dot: "bg-red-500", border: "border-l-red-500" }
+    : { bg: "bg-blue-50", text: "text-blue-600", label: "PENDIENTE", dot: "bg-blue-500", border: "border-l-blue-500" };
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 card-hover">
-      <div className="flex items-center justify-between mb-2">
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 ${statusConfig.border} card-hover overflow-hidden`}>
+      <div className="p-4 cursor-pointer" onClick={() => setOpen(!open)}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
+            <span className={`text-[11px] font-bold ${statusConfig.text} ${statusConfig.bg} px-2 py-0.5 rounded-md`}>
+              {statusConfig.label}
+            </span>
+          </div>
+          <svg className={`w-4 h-4 text-gray-300 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+
+        <p className="text-[13px] text-gray-600 mb-2">{ev ? `${ev.away_team} vs ${ev.home_team}` : ""}</p>
+
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
-          <span className={`text-[10px] font-bold ${statusConfig.text} ${statusConfig.bg} px-2 py-0.5 rounded-md`}>
-            {statusConfig.label}
-          </span>
-          {ev?.commence_time && (
-            <span className="text-[10px] text-gray-400">
-              {new Date(ev.commence_time).toLocaleDateString("es-PR", { month: "short", day: "numeric" })}{" "}
-              {new Date(ev.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" })}
+          <p className="text-[10px] text-gray-400 font-medium uppercase">Ganador:</p>
+          <p className="text-[16px] font-bold text-gray-900">{bet.outcome_name as string}</p>
+          {isFavorite && (
+            <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">
+              FAV
             </span>
           )}
         </div>
-        {profit != null && (
-          <span className={`text-[14px] font-extrabold font-mono ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-            {profit >= 0 ? "+" : ""}${profit.toFixed(0)}
-          </span>
-        )}
       </div>
-      <p className="text-[12px] text-gray-500 mb-0.5">{ev ? `${ev.away_team} vs ${ev.home_team}` : ""}</p>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <p className="text-[14px] font-bold text-gray-900">{bet.outcome_name as string}</p>
-          {odds < 0 && <span className="text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">FAV</span>}
+
+      {open && (
+        <div className="px-4 pb-4 border-t border-gray-50 bg-gray-50/50">
+          <div className="flex items-center justify-between mt-3 mb-2">
+            {ev?.commence_time && (
+              <span className="text-[10px] text-gray-400">
+                {new Date(ev.commence_time).toLocaleDateString("es-PR", { month: "short", day: "numeric" })}{" "}
+                {new Date(ev.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" })}
+              </span>
+            )}
+            {profit != null && !isCancelled && (
+              <span className={`text-[14px] font-extrabold font-mono ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                {profit >= 0 ? "+" : ""}${profit.toFixed(0)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] text-gray-500">Odds</p>
+            <span className="text-[15px] font-extrabold text-orange-500 font-mono">{formatOdds(odds)}</span>
+          </div>
+          {ev?.scores && (
+            <p className="text-[11px] text-gray-400 font-mono">
+              Score: {ev.scores.away} - {ev.scores.home}
+            </p>
+          )}
         </div>
-        <span className="text-[15px] font-extrabold text-orange-500 font-mono">{formatOdds(odds)}</span>
-      </div>
-      {ev?.scores && (
-        <p className="text-[11px] text-gray-400 mt-1 font-mono">
-          Score: {ev.scores.away} - {ev.scores.home}
-        </p>
       )}
     </div>
   );

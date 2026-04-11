@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BOOKMAKERS, MARKET_LABELS, SPORTS } from "@/lib/constants";
@@ -22,6 +23,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export function BetCard({ rec }: { rec: Recommendation }) {
+  const [open, setOpen] = useState(false);
   const sport = rec.event?.sport_key
     ? SPORTS[rec.event.sport_key as keyof typeof SPORTS]
     : null;
@@ -33,54 +35,69 @@ export function BetCard({ rec }: { rec: Recommendation }) {
         minute: "2-digit",
       })
     : "";
+  const isFavorite = rec.odds < 0;
 
   return (
     <Card className="hover:border-blue-200 transition-colors">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 cursor-pointer" onClick={() => setOpen(!open)}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {sport && (
-              <span className="text-sm">
-                {sport.emoji} {sport.name}
-              </span>
-            )}
-            <Badge
-              variant="secondary"
-              className={TYPE_COLORS[rec.type] ?? ""}
-            >
-              {TYPE_LABELS[rec.type] ?? rec.type}
-            </Badge>
-          </div>
-          <ConfidenceMeter score={rec.confidence_score} />
+          <Badge variant="secondary" className={TYPE_COLORS[rec.type] ?? ""}>
+            {TYPE_LABELS[rec.type] ?? rec.type}
+          </Badge>
+          <svg
+            className={`w-4 h-4 text-gray-300 transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
         </div>
-        <CardTitle className="text-sm font-medium mt-1">
+        <CardTitle className="text-sm font-medium mt-2">
           {rec.event
-            ? `${rec.event.away_team} @ ${rec.event.home_team}`
+            ? `${rec.event.away_team} vs ${rec.event.home_team}`
             : "Evento"}
         </CardTitle>
-        <p className="text-xs text-muted-foreground">{gameTime}</p>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {MARKET_LABELS[rec.market_key] ?? rec.market_key}
-            </p>
-            <p className="font-semibold">{rec.outcome_name}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">
-              {bookmaker?.name ?? rec.bookmaker_key}
-            </p>
-            <p className="text-lg font-bold text-blue-600">
-              {formatOdds(rec.odds)}
-            </p>
-          </div>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-[10px] text-muted-foreground font-medium uppercase">Ganador:</p>
+          <p className="text-base font-bold">{rec.outcome_name}</p>
+          {isFavorite && (
+            <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">
+              FAV
+            </span>
+          )}
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          {rec.reasoning}
-        </p>
-      </CardContent>
+      </CardHeader>
+      {open && (
+        <CardContent>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              {sport && (
+                <span className="text-sm">
+                  {sport.emoji} {sport.name}
+                </span>
+              )}
+              {gameTime && <span className="text-xs text-muted-foreground">{gameTime}</span>}
+            </div>
+            <ConfidenceMeter score={rec.confidence_score} />
+          </div>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {MARKET_LABELS[rec.market_key] ?? rec.market_key}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {bookmaker?.name ?? rec.bookmaker_key}
+              </p>
+            </div>
+            <p className="text-lg font-bold text-blue-600">{formatOdds(rec.odds)}</p>
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {rec.reasoning}
+          </p>
+        </CardContent>
+      )}
     </Card>
   );
 }

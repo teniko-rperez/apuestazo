@@ -82,83 +82,94 @@ function BetCard({ bet }: { bet: SimBet }) {
   const isSafe = bet.reasoning?.includes('MAS SEGURA');
   const isSecure = bet.reasoning?.includes('SEGURA') && !isSafe;
   const sport = bet.events?.sport_key === "basketball_nba" ? "NBA" : "MLB";
+  const isFavorite = bet.odds < 0;
 
   return (
     <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 border-l-4 ${statusConfig.border} overflow-hidden card-hover`}>
       <div className="p-4 cursor-pointer" onClick={() => setOpen(!open)}>
-        {/* Top row: status + sport + time */}
+        {/* Banner only */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
-            <span className={`text-[10px] font-bold ${statusConfig.text} ${statusConfig.bg} px-2 py-0.5 rounded-md`}>
+            <span className={`text-[11px] font-bold ${statusConfig.text} ${statusConfig.bg} px-2 py-0.5 rounded-md`}>
               {statusConfig.label}
             </span>
-            <span className={`text-[10px] font-black text-white px-1.5 py-0.5 rounded ${sport === "NBA" ? "bg-orange-500" : "bg-blue-500"}`}>
-              {sport}
-            </span>
-            {isSafe && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">MAS SEGURA</span>}
-            {isSecure && <span className="text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">SEGURA</span>}
           </div>
-          <div className="flex items-center gap-2">
+          <svg className={`w-4 h-4 text-gray-300 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+          </svg>
+        </div>
+
+        {/* Teams */}
+        <p className="text-[13px] text-gray-600 mb-2">
+          {bet.events ? `${bet.events.away_team} vs ${bet.events.home_team}` : ""}
+        </p>
+
+        {/* Ganador + favorito */}
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-gray-400 font-medium uppercase">Ganador:</p>
+          <p className="text-[16px] font-bold text-gray-900">{bet.outcome_name}</p>
+          {isFavorite && (
+            <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">
+              FAV
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded details */}
+      {open && (
+        <div className="px-4 pb-4 border-t border-gray-50 bg-gray-50/50">
+          {/* Sport + flags + profit */}
+          <div className="flex items-center justify-between mt-3 mb-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-[10px] font-black text-white px-1.5 py-0.5 rounded ${sport === "NBA" ? "bg-orange-500" : "bg-blue-500"}`}>
+                {sport}
+              </span>
+              {isSafe && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">MAS SEGURA</span>}
+              {isSecure && <span className="text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">SEGURA</span>}
+              {bet.events && bet.outcome_name === bet.events.home_team && <span className="text-[9px] text-blue-500 font-semibold">HOME</span>}
+            </div>
             {bet.profit != null && !isCancelled && (
               <span className={`text-[14px] font-extrabold font-mono ${bet.profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                 {bet.profit >= 0 ? "+" : ""}${bet.profit.toFixed(0)}
               </span>
             )}
-            <svg className={`w-4 h-4 text-gray-300 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
           </div>
-        </div>
 
-        {/* Teams */}
-        <div className="mb-2">
-          <p className="text-[12px] text-gray-500">
-            {bet.events ? `${bet.events.away_team}` : ""}
-            {bet.events?.scores && <span className="font-bold text-gray-800 mx-1">{bet.events.scores.away}</span>}
-            {" vs "}
-            {bet.events ? `${bet.events.home_team}` : ""}
-            {bet.events?.scores && <span className="font-bold text-gray-800 mx-1">{bet.events.scores.home}</span>}
-            {bet.events && <span className="text-[10px] text-blue-500 font-semibold ml-1">({bet.events.home_team} HOME)</span>}
-            {bet.odds < 0 && (
-              <span className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded ml-1.5">
-                {bet.outcome_name} FAV
-              </span>
-            )}
-          </p>
-          {bet.events?.commence_time && (
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              {new Date(bet.events.commence_time).toLocaleDateString("es-PR", { weekday: "short", month: "short", day: "numeric" })}{" "}
-              {new Date(bet.events.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" })}
-            </p>
+          {/* Score + time */}
+          {bet.events && (
+            <div className="mb-3">
+              {bet.events.scores && (
+                <p className="text-[12px] text-gray-600">
+                  {bet.events.away_team} <span className="font-bold text-gray-900">{bet.events.scores.away}</span>
+                  {" - "}
+                  <span className="font-bold text-gray-900">{bet.events.scores.home}</span> {bet.events.home_team}
+                </p>
+              )}
+              {bet.events.commence_time && (
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {new Date(bet.events.commence_time).toLocaleDateString("es-PR", { weekday: "short", month: "short", day: "numeric" })}{" "}
+                  {new Date(bet.events.commence_time).toLocaleTimeString("es-PR", { hour: "numeric", minute: "2-digit" })}
+                </p>
+              )}
+            </div>
           )}
-        </div>
 
-        {/* Pick + Odds */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[10px] text-gray-400 font-medium">Ganador</p>
-            <div className="flex items-center gap-1.5">
-              <p className="text-[16px] font-bold text-gray-900">{bet.outcome_name}</p>
-              {bet.events && bet.outcome_name === bet.events.home_team && <span className="text-[9px] text-blue-500 font-semibold">HOME</span>}
-              {bet.odds < 0 && <span className="text-[8px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">FAV</span>}
+          {/* Odds */}
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] text-gray-500">Odds</p>
+            <div className="text-right">
+              <p className="text-lg font-extrabold text-orange-500 font-mono">{formatOdds(bet.odds)}</p>
+              {bet.odds !== 0 && <p className="text-[10px] text-gray-400">{explainOdds(bet.odds, bet.stake)}</p>}
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xl font-extrabold text-orange-500 font-mono">{formatOdds(bet.odds)}</p>
-            {bet.odds !== 0 && <p className="text-[10px] text-gray-400">{explainOdds(bet.odds, bet.stake)}</p>}
-          </div>
-        </div>
 
-        {isCancelled && cancelReason && (
-          <p className="text-[10px] text-gray-400 italic mt-2">Razon: {cancelReason}</p>
-        )}
-      </div>
+          {isCancelled && cancelReason && (
+            <p className="text-[10px] text-gray-400 italic mb-3">Razon: {cancelReason}</p>
+          )}
 
-      {/* Expanded reasoning */}
-      {open && (
-        <div className="px-4 pb-4 border-t border-gray-50 bg-gray-50/50">
-          <p className="text-[12px] font-bold text-gray-700 mt-3 mb-2">Por que esta recomendacion?</p>
+          <p className="text-[12px] font-bold text-gray-700 mb-2">Por que esta recomendacion?</p>
 
           {signals.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -228,10 +239,11 @@ export default function SimulacionesPage() {
       </div>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-5 gap-2 lg:gap-3 mb-6">
+      <div className="grid grid-cols-6 gap-2 lg:gap-3 mb-6">
         {[
           { label: "TOTAL", value: stats.total, color: "text-gray-900" },
           { label: "GANADAS", value: stats.won, color: "text-emerald-600" },
+          { label: "PERDIDAS", value: stats.lost, color: "text-red-500" },
           { label: "CANCEL", value: stats.cancelled, color: "text-gray-500" },
           { label: "WIN %", value: `${stats.winRate}%`, color: "text-gray-900" },
           { label: "P/L", value: `${stats.profit >= 0 ? "+" : ""}$${stats.profit.toFixed(0)}`, color: stats.profit >= 0 ? "text-emerald-600" : "text-red-500" },
